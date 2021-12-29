@@ -6,6 +6,8 @@ from copy import deepcopy
 import os
 import datetime
 import numpy as np
+from time import perf_counter
+
 
 
 def getEvaluation(solution:list,objets:dict):
@@ -144,6 +146,8 @@ def mise_a_jour_ens_potentiellement_efficace(ens_pot_efficace:list,candidat_a_la
     if(len(ens_pot_efficace)==0):
         ens_pot_efficace.append(candidat_a_lajout)
         return ens_pot_efficace, True
+    elif(candidat_a_lajout in ens_pot_efficace):
+        return ens_pot_efficace,False
     else:
 
         for solution_pot_efficace in ens_pot_efficace: #on cherche une solution potentiellement efficace qui domine le candidat
@@ -160,6 +164,7 @@ def mise_a_jour_ens_potentiellement_efficace(ens_pot_efficace:list,candidat_a_la
         ens_pot_efficace_a_jour=[sol for sol in ens_pot_efficace if sol not in toRemove]
         
         return ens_pot_efficace_a_jour, True
+            
 
 def voisinage(solution:list, objets:dict, W:int):
     """Fonction qui renvoie les voisins d'une solution en faisant des échanges 1-1 et en remplissant l'espace qui reste avec des objets qui rentrent dans le sac.
@@ -181,24 +186,41 @@ def voisinage(solution:list, objets:dict, W:int):
     voisinage=set()
     poids_solution=getPoidsSol(solution,objets)
     objetsAEnlever=[i for i in range(len(solution)) if solution[i]==1] #les objets pris dans solution
+    # print(f"solution : {solution}\n")
+    # print(f"poids_solution : {poids_solution}\n")
+    # print(f"objets : {objets}\n")
 
     for objet_a_enlever in objetsAEnlever:
         for objet_candidat,values in objets.items():
             if objet_candidat not in objetsAEnlever :
+                # print(f"objet_a_enlever : {objet_a_enlever}\n")
+                # print(f"objet_candidat : {objet_candidat}\n")
+                # print(f"values : {values}\n")
                 if poids_solution-objets[objet_a_enlever][0]+values[0]<=W:
+                    # print("in1")
                     solution_temp=solution.copy()
                     solution_temp[objet_a_enlever]=0
                     solution_temp[objet_candidat]=1
-
+                    # print(f"solution_temp : {solution_temp}\n")
+                    # print(f"poids_solution_temp : {poids_solution-objets[objet_a_enlever][0]+values[0]} ou {getPoidsSol(solution_temp,objets)}\n")
+                    # print(f"W : {W}\n")
                     poids_sol_temp=poids_solution-objets[objet_a_enlever][0]+values[0]
                     objets_candidats_restant=[i for i in range(len(solution)) if solution_temp[i]==0]
+                    # print(f"objets_candidats_restant : {objets_candidats_restant}\n")
                     while(len(objets_candidats_restant)):
+                        # print("in2")
                         candidat=rand.choice(objets_candidats_restant)
+                        # print(f"candidat : {candidat}\n")
                         objets_candidats_restant.remove(candidat)
                         if(poids_sol_temp+objets[candidat][0]<=W):
+                            # print("in3")
                             poids_sol_temp+=objets[candidat][0]
                             solution_temp[candidat]=1
+                            # print(f"solution_temp : {solution_temp}\n")
+                            # print(f"poids_solution_temp : {poids_sol_temp} ou {getPoidsSol(solution_temp,objets)}\n")
+                            # print(f"W : {W}\n")
                     voisinage.add(tuple(solution_temp))
+                    #print(f"voisinage de {solution}: {voisinage}\n")
     return [list(voisin) for voisin in voisinage]
 
 def genererSolutionInitiale(objets:dict,W:int):
@@ -219,11 +241,14 @@ def genererSolutionInitiale(objets:dict,W:int):
     """
     sol_initiale=[0 for _ in objets.keys()]
     rapport_de_performance=[]
-    ponderation=[rand.randint(1,10) for _ in objets.keys()]
+
+    nb_critères=len(list(objets.values())[0])-1
+    ponderation=[rand.randint(1,10) for _ in range(nb_critères)]
     sumPonderation=sum(ponderation)
     ponderation=[p/sumPonderation for p in ponderation]
+
     for key,value in objets.items():
-        rapport_de_performance.append([key,sum(value[i]*ponderation[i] for i in range(1,len(value)))/value[0]])
+        rapport_de_performance.append([key,sum(value[i]*ponderation[i-1] for i in range(1,len(value)))/value[0]])
     rapport_de_performance.sort(key=lambda x:x[1],reverse=True)
     for key,_ in rapport_de_performance:
         if getPoidsSol(sol_initiale,objets)+objets[key][0]<W:
@@ -232,34 +257,37 @@ def genererSolutionInitiale(objets:dict,W:int):
 
 def genererPopulationInitiale(nbIndividuMax:int,objets:dict,W:int):
     pop=set()
-    countdown=50
+    countdown=100
     while(len(pop)<nbIndividuMax and countdown>=0): #on essaye de génerer une population initiale de taille maximale de nbIndividuMax
         countdown-=1
         oldLen=len(pop)
         pop.add(tuple(genererSolutionInitiale(objets,W)))
-        if(len(pop)>oldLen): #à chaque fois qu'on a un nouvel individu on laisse 50 itération au programme pour qu'il essait d'en trouver un autre
-            countdown=50
+        if(len(pop)>oldLen): #à chaque fois qu'on a un nouvel individu on laisse countdown itération au programme pour qu'il essait d'en trouver un autre
+            countdown=100
     return [list(sol) for sol in pop]
-#Approximation des points non-dominés
 
-def PLS(pop_init:list,voisinage,objets:dict,W:int):
+def PLS(pop_init:list,voisinage,objets:dict,W:int): #Approximation des points non-dominés
+    t1_start = perf_counter()
     non_domines_approx=deepcopy(pop_init)
     P=deepcopy(pop_init)
     Pa=[]
+    t=0
     while(len(P)):
-        print(f"X_E de taille {len(non_domines_approx)}\nP de taille {len(P)}\n")
+        #print(f"X_E : {non_domines_approx} de taille {len(non_domines_approx)}\nP : {P} de taille {len(P)}\n")
         for p in P:
-            for p_ in voisinage(p,objets,W):
-                if(not isDom(p,p_,objets)):
-                    non_domines_approx,hasChanged=mise_a_jour_ens_potentiellement_efficace(non_domines_approx,p_,objets)
+            for p_voisin in voisinage(p,objets,W):
+                if(not isDom(p,p_voisin,objets) and getEvaluation(p,objets)!=getEvaluation(p_voisin,objets)):
+                    non_domines_approx,hasChanged=mise_a_jour_ens_potentiellement_efficace(non_domines_approx,p_voisin,objets)
                     if hasChanged:
-                        Pa,_=mise_a_jour_ens_potentiellement_efficace(Pa,p_,objets)
+                        Pa,_=mise_a_jour_ens_potentiellement_efficace(Pa,p_voisin,objets)
         P=deepcopy(Pa)
         Pa=[]
+    t1_stop = perf_counter()
     dirname = os.path.dirname(__file__)
     date=str(datetime.datetime.now()).replace(" ", "")
-    filename = os.path.join(dirname+"/logs", f"PSL_n_{len(objets)}_p_{len(list(objets.values())[0])-1}_{date}.txt")
+    filename = os.path.join(dirname+"/logs", f"PLS1_n_{len(objets)}_p_{len(list(objets.values())[0])-1}_{date}.txt")
     log=open(filename,'w+')
+    log.write("logType\nPLS1\n\n")
     log.write("non_domines_approx\n")
     log.write(str(non_domines_approx))
     log.write("\n\n")
@@ -271,30 +299,42 @@ def PLS(pop_init:list,voisinage,objets:dict,W:int):
     log.write("\n\n")
     log.write("capacité max\n")
     log.write(str(W))
+    log.write("\n\n")
+    log.write("execution_time\n")
+    log.write(f"{t1_stop-t1_start}\n")
+    log.write("\n\n")
+    log.write("n\n")
+    log.write(f"{len(objets.values())}\n")
+    log.write("\n\n")
+    log.write("p\n")
+    log.write(f"{len(list(objets.values())[0])-1}\n")
     log.close()
     return non_domines_approx
 
 def PLS2(pop_init:list,voisinage,objets:dict,W:int):
+    t1_start = perf_counter()
     non_domines_approx=deepcopy(pop_init)
     P=deepcopy(pop_init)
     Pa=[]
     while(len(P)):
-        print(f"X_E de taille {len(non_domines_approx)}\nP de taille {len(P)}\n")
+        #print(f"X_E : {non_domines_approx} de taille {len(non_domines_approx)}\nP : {P} de taille {len(P)}\n")
         for p in P:
             LN=[]
-            for p_ in voisinage(p,objets,W):
-                if(not isDom(p,p_,objets)):
-                    LN,_=mise_a_jour_ens_potentiellement_efficace(LN,p_,objets)
-            for p_ in LN:
-                non_domines_approx,hasChanged=mise_a_jour_ens_potentiellement_efficace(non_domines_approx,p_,objets)
+            for p_voisin in voisinage(p,objets,W):
+                if(not isDom(p,p_voisin,objets)):
+                    LN,_=mise_a_jour_ens_potentiellement_efficace(LN,p_voisin,objets)
+            for p_voisin in LN:
+                non_domines_approx,hasChanged=mise_a_jour_ens_potentiellement_efficace(non_domines_approx,p_voisin,objets)
                 if hasChanged:
-                    Pa,_=mise_a_jour_ens_potentiellement_efficace(Pa,p_,objets)
+                    Pa,_=mise_a_jour_ens_potentiellement_efficace(Pa,p_voisin,objets)
         P=deepcopy(Pa)
         Pa=[]
+    t1_stop = perf_counter()
     dirname = os.path.dirname(__file__)
     date=str(datetime.datetime.now()).replace(" ", "")
-    filename = os.path.join(dirname+"/logs", f"PSL_n_{len(objets)}_p_{len(list(objets.values())[0])-1}_{date}.txt")
+    filename = os.path.join(dirname+"/logs", f"PLS2_n_{len(objets)}_p_{len(list(objets.values())[0])-1}_{date}.txt")
     log=open(filename,'w+')
+    log.write("logType\nPLS1\n\n")
     log.write("non_domines_approx\n")
     log.write(str(non_domines_approx))
     log.write("\n\n")
@@ -306,6 +346,15 @@ def PLS2(pop_init:list,voisinage,objets:dict,W:int):
     log.write("\n\n")
     log.write("capacité max\n")
     log.write(str(W))
+    log.write("\n\n")
+    log.write("execution_time\n")
+    log.write(f"{t1_stop-t1_start}\n")
+    log.write("\n\n")
+    log.write("n\n")
+    log.write(f"{len(objets.values())}\n")
+    log.write("\n\n")
+    log.write("p\n")
+    log.write(f"{len(list(objets.values())[0])-1}\n")
     log.close()
     return non_domines_approx
 

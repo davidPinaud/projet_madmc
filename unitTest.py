@@ -1,17 +1,24 @@
-from instance_loader import getInstance
+from ast import parse
+from instance_loader import getInstance, getInstance_withRandomSelection
 from PLS import *
+import numpy as np
 
-
-def test_1_mise_a_jour_ens_potentiellement_efficace():
+def test_1_mise_a_jour_ens_potentiellement_efficace(verbose=False):
     """test si quand un candidat non dominé par les sols pot eff arrive, on le rajoute bien et on efface bien les nouveaux dominées
     """
     ens_pot_efficace, hasChanged=mise_a_jour_ens_potentiellement_efficace(ens_pot_efficace_test1,solution_realisable_test1,objets_test)
+    if(verbose):
+        print("\navant candidature",ens_pot_efficace_test1, "candidat : ",solution_realisable_test1)
+        print("après candidature, hasChanged : ", hasChanged," et nouvel ens :",ens_pot_efficace,"\n")
     return hasChanged==True and ens_pot_efficace==[solution_realisable_test1]
 
-def test_2_mise_a_jour_ens_potentiellement_efficace():
+def test_2_mise_a_jour_ens_potentiellement_efficace(verbose=False):
     """test si quand un candidat dominé par au moins un sol pot eff arrive, on le rajoute pas et on efface rien
     """
     ens_pot_efficace, hasChanged=mise_a_jour_ens_potentiellement_efficace(ens_pot_efficace_test2,solution_realisable_test2,objets_test)
+    if(verbose):
+        print("\navant candidature",ens_pot_efficace_test2, "candidat : ",solution_realisable_test2)
+        print("après candidature, hasChanged : ", hasChanged," et nouvel ens :",ens_pot_efficace,"\n")
     return hasChanged==False and ens_pot_efficace==[solution_realisable_test1]
 
 def test_isDomFaible():
@@ -35,8 +42,12 @@ def test_isDomStrict():
     cond = cond and False==isDomStrict(solution_realisable_test3,solution_realisable_test2,objets_test)
     return cond
 
-def test_basiques(objets_test,W_test):
-
+def test_basique():
+    ###Instance####
+    n=5
+    p=4
+    objets_test, W_test=getInstance(n,p)
+    #objets_test, W_test,indices_from_objets_random_dict_to_objets=getInstance_withRandomSelection(n,p)
     ####Données Test####
     solution_non_realisable_test1=[1,0,1,1,0]
     solution_non_realisable_test2=[0,0,1,1,1]
@@ -61,17 +72,24 @@ def test_basiques(objets_test,W_test):
     print("test_1_mise_a_jour_ens_potentiellement_efficace",test_1_mise_a_jour_ens_potentiellement_efficace())
     print("test_2_mise_a_jour_ens_potentiellement_efficace",test_2_mise_a_jour_ens_potentiellement_efficace())
     print(f"genererSolutionInitiale {genererSolutionInitiale(objets_test,W_test)}")
-    print(f"voisinage {voisinage(solution_realisable_test3,objets_test,W_test)}")
+    print(f"voisinage de {solution_realisable_test3} : {voisinage(solution_realisable_test3,objets_test,W_test)}")
 
-def test_PLS(objets_test, W_test):
-    pop_init=genererPopulationInitiale(20,objets_test,W_test)
-    print(f"genererPopulationInitiale {pop_init}, longueur {len(pop_init)}")
+def test_PLS(objets_test, W_test,PLStype):
+    nb_solution_dans_popInit=20
+    pop_init=genererPopulationInitiale(nb_solution_dans_popInit,objets_test,W_test)
+    print(f"\ngenererPopulationInitiale {pop_init}, longueur {len(pop_init)}")
     print(f"PLS {PLS(pop_init,voisinage,objets_test,W_test)}")
+    print(f"PLS {PLS2(pop_init,voisinage,objets_test,W_test)}")
+
 if __name__== "__main__":
-    ####Instance####
-    n=8
-    p=3
-    objets_test, W_test=getInstance(n,p)
-    test_PLS(objets_test, W_test)
-    
+
+    test_basique()
+    ###Générer les logs de PLS###
+    # for n in range(1,41):
+    #     for p in range(1,5):
+    #         print(n," ",p)
+    #         objets_test, W_test=getInstance(n,p)
+    #         test_PLS(objets_test, W_test,1)
+
+
     

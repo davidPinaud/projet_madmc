@@ -105,10 +105,8 @@ if __name__== "__main__":
 
 
     ######## Générer les logs de PLS ########
-    for n in range(39,42):
+    for n in range(41,46):
         for p in range(1,6):
-            if(n==39 and p in [1,2,3,4]):
-                continue
             print(f"n {n} p {p}")
             objets_test, W_test=getInstance(n,p)
             test_PLS(objets_test, W_test)

@@ -1,4 +1,6 @@
 
+#Auteur : David PINAUD
+#Description : Essai d'implémentation de quad_tree (non complet)
 
 def isDom(perf1,perf2):
     """true if perf1>perf2 (dom pareto)

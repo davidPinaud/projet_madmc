@@ -22,6 +22,8 @@ def test_2_mise_a_jour_ens_potentiellement_efficace(verbose=False):
     return hasChanged==False and ens_pot_efficace==[solution_realisable_test1]
 
 def test_isDomFaible():
+    """test la dominance faible de pareto >=
+    """
     cond= True==isDomFaible(solution_realisable_test1,solution_realisable_test2,objets_test)
     cond = cond and False==isDomFaible(solution_realisable_test2,solution_realisable_test1,objets_test)
     cond = cond and False==isDomFaible(solution_realisable_test2,solution_realisable_test3,objets_test)
@@ -29,6 +31,8 @@ def test_isDomFaible():
     return cond
 
 def test_isDom():
+    """test la dominance de pareto >
+    """
     cond= True==isDom(solution_realisable_test1,solution_realisable_test2,objets_test)
     cond = cond and False==isDom(solution_realisable_test2,solution_realisable_test1,objets_test)
     cond = cond and False==isDomStrict(solution_realisable_test2,solution_realisable_test3,objets_test)
@@ -36,6 +40,8 @@ def test_isDom():
     return cond
 
 def test_isDomStrict():
+    """test la dominance stricte de pareto >>
+    """
     cond=True==isDomStrict(solution_realisable_test1,solution_realisable_test2,objets_test)
     cond = cond and False==isDomStrict(solution_realisable_test2,solution_realisable_test1,objets_test)
     cond = cond and False==isDomStrict(solution_realisable_test2,solution_realisable_test3,objets_test)
@@ -43,19 +49,8 @@ def test_isDomStrict():
     return cond
 
 def test_basique():
-    ###Instance####
-    n=5
-    p=4
-    objets_test, W_test=getInstance(n,p)
-    #objets_test, W_test,indices_from_objets_random_dict_to_objets=getInstance_withRandomSelection(n,p)
-    ####Données Test####
-    solution_non_realisable_test1=[1,0,1,1,0]
-    solution_non_realisable_test2=[0,0,1,1,1]
-    solution_realisable_test1=[1,0,0,1,1]
-    solution_realisable_test2=[0,1,0,0,1]
-    solution_realisable_test3=[0,0,1,0,1]
-    ens_pot_efficace_test1=[solution_realisable_test2,solution_realisable_test3]
-    ens_pot_efficace_test2=[solution_realisable_test1]
+    """Permet de tester si les fonctions basiques et utilitaires ont les bons comportements
+    """
     print(f"\n\n****DONNÉES DU TEST****\n\n\
     objets_test {objets_test}\n\
     W_test {W_test}\n\
@@ -74,7 +69,16 @@ def test_basique():
     print(f"genererSolutionInitiale {genererSolutionInitiale(objets_test,W_test)}")
     print(f"voisinage de {solution_realisable_test3} : {voisinage(solution_realisable_test3,objets_test,W_test)}")
 
-def test_PLS(objets_test, W_test,PLStype):
+def test_PLS(objets_test, W_test):
+    """Permet de tester les deux formes de
+
+    Parameters
+    ----------
+    objets_test : dict
+        objets du problème du sac à dos
+    W_test : int
+        capacité du problème du sac à dos
+    """
     nb_solution_dans_popInit=20
     pop_init=genererPopulationInitiale(nb_solution_dans_popInit,objets_test,W_test)
     print(f"\ngenererPopulationInitiale {pop_init}, longueur {len(pop_init)}")
@@ -83,13 +87,31 @@ def test_PLS(objets_test, W_test,PLStype):
 
 if __name__== "__main__":
 
-    test_basique()
-    ###Générer les logs de PLS###
-    # for n in range(1,41):
-    #     for p in range(1,5):
-    #         print(n," ",p)
-    #         objets_test, W_test=getInstance(n,p)
-    #         test_PLS(objets_test, W_test,1)
+    ######## TEST BASIQUE ########
+        ###Instance####
+    n=5
+    p=4
+    objets_test, W_test=getInstance(n,p)
+    #objets_test, W_test,indices_from_objets_random_dict_to_objets=getInstance_withRandomSelection(n,p) #choix aléatoire des objets
+        ####Données Test####
+    solution_non_realisable_test1=[1,0,1,1,0]
+    solution_non_realisable_test2=[0,0,1,1,1]
+    solution_realisable_test1=[1,0,0,1,1]
+    solution_realisable_test2=[0,1,0,0,1]
+    solution_realisable_test3=[0,0,1,0,1]
+    ens_pot_efficace_test1=[solution_realisable_test2,solution_realisable_test3]
+    ens_pot_efficace_test2=[solution_realisable_test1]
+    #test_basique()
+
+
+    ######## Générer les logs de PLS ########
+    for n in range(39,42):
+        for p in range(1,6):
+            if(n==39 and p in [1,2,3,4]):
+                continue
+            print(f"n {n} p {p}")
+            objets_test, W_test=getInstance(n,p)
+            test_PLS(objets_test, W_test)
 
 
     

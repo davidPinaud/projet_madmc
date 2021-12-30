@@ -1,0 +1,25 @@
+logType
+PLS1
+
+non_domines_approx
+[[1, 0, 0, 0, 1, 1]]
+
+fonction de voisinage
+voisinage
+
+objets
+{0: [394, 783], 1: [911, 198], 2: [768, 278], 3: [477, 629], 4: [513, 952], 5: [636, 717]}
+
+capacité max
+1849.0
+
+execution_time
+0.00037511899999997933
+
+
+n
+6
+
+
+p
+1

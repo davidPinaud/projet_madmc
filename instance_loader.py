@@ -1,3 +1,6 @@
+#Auteur : David PINAUD
+#Description : fichier permettant de récuperer une instance du problème du sac à dos multi-objectifs en fonction du nombre d'objet et d'objectifs voulu
+
 import numpy as np
 import os
 import random as rand

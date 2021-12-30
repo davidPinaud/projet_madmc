@@ -1,6 +1,11 @@
 # Solution [x1,x2,...,xn]: liste telle que l'élément à l'indice i est le booléen qui indique si l'objet i est dans la solution ou non
 # objets {id_objet : [w, v1,v2, ... ,vp] ...}= liste des objets de l'instance, un dictionnaire avec comme clé l'indice de l'objet et comme valeur le poids w ainsi que les valeurs des critères de l'objet v1, ... , vp
 
+#Auteur : David PINAUD
+#Description : fichier permettant de lancer un Pareto Local Search pour une problème
+# de sac à dos multi-objectif
+
+
 import random as rand
 from copy import deepcopy
 import os
@@ -165,7 +170,6 @@ def mise_a_jour_ens_potentiellement_efficace(ens_pot_efficace:list,candidat_a_la
         
         return ens_pot_efficace_a_jour, True
             
-
 def voisinage(solution:list, objets:dict, W:int):
     """Fonction qui renvoie les voisins d'une solution en faisant des échanges 1-1 et en remplissant l'espace qui reste avec des objets qui rentrent dans le sac.
 
@@ -256,6 +260,22 @@ def genererSolutionInitiale(objets:dict,W:int):
     return sol_initiale
 
 def genererPopulationInitiale(nbIndividuMax:int,objets:dict,W:int):
+    """Fonction qui permet de générer une population initiale de solutions réalisables.
+
+    Parameters
+    ----------
+    nbIndividuMax : int
+        nombre d'invidu maximal dans cette population
+    objets : dict
+        les objets du problème
+    W : int
+        la capacité maximale du sac à dos
+
+    Returns
+    -------
+    list
+        liste de solutions réalisable du problème
+    """
     pop=set()
     countdown=100
     while(len(pop)<nbIndividuMax and countdown>=0): #on essaye de génerer une population initiale de taille maximale de nbIndividuMax
@@ -267,6 +287,26 @@ def genererPopulationInitiale(nbIndividuMax:int,objets:dict,W:int):
     return [list(sol) for sol in pop]
 
 def PLS(pop_init:list,voisinage,objets:dict,W:int): #Approximation des points non-dominés
+    """Implémentation de l'algorithme Pareto Local Search avec une mise à jour de l'ensemble
+    approximant l'ensemble des non dominés faite de façon forte brute.
+    Enregistre aussi les résultats dans un fichier log.
+
+    Parameters
+    ----------
+    pop_init : list
+        liste de solutions sur lequel commencer la recherche locale
+    voisinage : function
+        fonction de voisinage d'une solution
+    objets : dict
+        les objets du problème
+    W : int
+        capacité maximale du sac à dos
+
+    Returns
+    -------
+    list
+        Une approximation de l'ensemble des non dominés
+    """
     t1_start = perf_counter()
     non_domines_approx=deepcopy(pop_init)
     P=deepcopy(pop_init)
@@ -312,6 +352,28 @@ def PLS(pop_init:list,voisinage,objets:dict,W:int): #Approximation des points no
     return non_domines_approx
 
 def PLS2(pop_init:list,voisinage,objets:dict,W:int):
+    """Implémentation de l'algorithme Pareto Local Search avec une mise à jour de l'ensemble
+    approximant l'ensemble des non dominés faite de façon forte brute.
+    Enregistre aussi les résultats dans un fichier log.
+
+    Version 2 un peu plus efficace.
+
+    Parameters
+    ----------
+    pop_init : list
+        liste de solutions sur lequel commencer la recherche locale
+    voisinage : function
+        fonction de voisinage d'une solution
+    objets : dict
+        les objets du problème
+    W : int
+        capacité maximale du sac à dos
+
+    Returns
+    -------
+    list
+        Une approximation de l'ensemble des non dominés
+    """
     t1_start = perf_counter()
     non_domines_approx=deepcopy(pop_init)
     P=deepcopy(pop_init)
@@ -334,7 +396,7 @@ def PLS2(pop_init:list,voisinage,objets:dict,W:int):
     date=str(datetime.datetime.now()).replace(" ", "")
     filename = os.path.join(dirname+"/logs", f"PLS2_n_{len(objets)}_p_{len(list(objets.values())[0])-1}_{date}.txt")
     log=open(filename,'w+')
-    log.write("logType\nPLS1\n\n")
+    log.write("logType\nPLS2\n\n")
     log.write("non_domines_approx\n")
     log.write(str(non_domines_approx))
     log.write("\n\n")

@@ -275,6 +275,10 @@ def one_question_elicitation_OWA(X,preference,decideur):
     else:
         pass
     return MMR
+
+
+
+
 if __name__== "__main__":
     p=4
     n=18

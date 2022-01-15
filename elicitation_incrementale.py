@@ -105,6 +105,7 @@ def elicitation_incrementale_somme_ponderee(p:int,X:list,nb_pref_connues:int,MMR
     print(f"durée totale {time.time()-start}")
     for v in MMR[1][1][1].getVars():
        print(f"{v} = {v.x}")
+    print(f"décideur {decideur}")
     return MMR[0],nb_question,valeurOPT
 
 def one_question_elicitation_somme_ponderee(X,preference,decideur):
@@ -208,6 +209,7 @@ def elicitation_incrementale_OWA(p:int,X:list,nb_pref_connues:int,MMRlimit=0.001
     print(f"durée totale {time.time()-start}")
     for v in MMR[1][1][1].getVars():
        print(f"{v} = {v.x}")
+    print(f"décideur {decideur}")
     return MMR[0],nb_question,valeurOPT
 
 
@@ -275,7 +277,7 @@ def one_question_elicitation_OWA(X,preference,decideur):
     return MMR
 if __name__== "__main__":
     p=4
-    n=30
+    n=18
     for log in get_all_PLS_logs():
         if(log["logType"]=="PLS1" and log["n"]==n and log["p"]==p):
             nonDom=log["non_domines_approx"]
@@ -283,8 +285,8 @@ if __name__== "__main__":
             X=[getEvaluation(sol,objets) for sol in nonDom]
             break
     
-    #elicitation_incrementale_somme_ponderee(p,X,nb_pref_connues=int(np.floor(len(nonDom)*0.20)))
-    elicitation_incrementale_OWA(p,X,nb_pref_connues=int(np.floor(len(nonDom)*0.20)))
+    elicitation_incrementale_somme_ponderee(p,X,nb_pref_connues=int(np.floor(len(nonDom)*0.20)))
+    #elicitation_incrementale_OWA(p,X,nb_pref_connues=int(np.floor(len(nonDom)*0.20)))
 
 
 

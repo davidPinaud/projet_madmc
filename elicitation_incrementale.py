@@ -5,7 +5,7 @@ import random as rand
 import numpy as np
 import itertools as iter
 from PLS import getEvaluation
-
+import ast
 #normaliser : diviser par le premier maximum regret
 
 
@@ -24,7 +24,7 @@ def getRandomPoids(p:int):
     """
     poids=[rand.random() for _ in range(p)]
     max=np.max(poids)
-    poids=[poids/max for pi in poids]
+    poids=[pi/max for pi in poids]
     return poids
 
 def domSommePonderee(poids,x,y):
@@ -54,11 +54,11 @@ def domSommePonderee(poids,x,y):
 
 def getMR(PMR,x):
     max_regret=""
-    for y,regret in PMR[x].items():
+    for y,regret in PMR[repr(x)].items():
         if max_regret=="":
-            max_regret=(y,regret)
+            max_regret=(ast.literal_eval(y),regret)
         else:
-            max_regret=max_regret if max_regret[1]>regret else (y,regret)
+            max_regret=max_regret if max_regret[1]>regret else (ast.literal_eval(y),regret)
     return max_regret #doublet (solution,regret)
 
 # X: ens des potentiellement non dominés
@@ -67,7 +67,7 @@ def elicitation_incrementale_somme_ponderee(p:int,X:list,nb_pref_connues:int,MMR
     decideur=getRandomPoids(p)
     print(f"décideur {decideur}")
     #Création de nb_pref_connues contraintes (préférences connues)
-    allPairsSolutions=iter.combinations(X,2)
+    allPairsSolutions=list(iter.combinations(X,2))
     solution_init_pref=rand.choices(allPairsSolutions,k=nb_pref_connues)
     preference=[] #P
     for x,y in solution_init_pref:
@@ -79,11 +79,11 @@ def elicitation_incrementale_somme_ponderee(p:int,X:list,nb_pref_connues:int,MMR
             pass
     
     
-    MMR=one_question_elicitation_somme_ponderee(allPairsSolutions,preference,decideur)
+    MMR=one_question_elicitation_somme_ponderee(X,allPairsSolutions,preference,decideur)
     nb_question=1
     while(MMR[1][1]>MMRlimit):
         print(f"x : {MMR[0]}\ny : {MMR[1][0]} : regret : {MMR[1][1]}")
-        MMR=one_question_elicitation_somme_ponderee(allPairsSolutions,preference,decideur)
+        MMR=one_question_elicitation_somme_ponderee(X,allPairsSolutions,preference,decideur)
         nb_question+=1
 
     valeurOPT=0
@@ -95,14 +95,14 @@ def one_question_elicitation_somme_ponderee(X,allPairsSolutions,preference,decid
     p=len(decideur) #nb de critère
     PMR={}
     for x in X:
-        PMR[x]={}
+        PMR[repr(x)]={}
     for x,y in allPairsSolutions: #calcul de PMR(x,y) pour chaque couple de solutions restantes
         x=np.array(x)
         y=np.array(y)
         # Create a new model
         m = gp.Model("elicitation_somme_ponderee")
         # Create variables
-        w = m.addVar(shape=p,vtype=GRB.C, name="w")
+        w = m.addMVar(shape=p,vtype=GRB.CONTINUOUS, name="w")
         # Set objective
         m.setObjective((y @ w) - (x @ w), GRB.MAXIMIZE)
         # Add constraints:
@@ -111,14 +111,14 @@ def one_question_elicitation_somme_ponderee(X,allPairsSolutions,preference,decid
         # Optimize model
         m.optimize()
 
-        PMR[x][y]=m.ObjVal
+        PMR[repr(x)][repr(y)]=m.ObjVal
 
     MR={} #dictionnaire de doublet (solution,regret) = (y,regret de prendre x au lieu de y)
     for x in X:
-        MR[x]=getMR(PMR,x)
+        MR[repr(x)]=getMR(PMR,x)
     MMR=min(MR.items(), key=lambda x:x[1][1]) # de la forme (x,(y,regret))
 
-    x_etoile=MMR[0]
+    x_etoile=ast.literal_eval(MMR[0])
     y_etoile=MMR[1][0]
 
     if domSommePonderee(decideur,x_etoile,y_etoile):
@@ -140,7 +140,7 @@ if __name__== "__main__":
             X=[getEvaluation(sol,objets) for sol in nonDom]
             break
     
-    elicitation_incrementale_somme_ponderee(p,X,nb_pref_connues=np.floor(len(nonDom)*0.20))
+    elicitation_incrementale_somme_ponderee(p,X,nb_pref_connues=int(np.floor(len(nonDom)*0.20)))
 
 
 

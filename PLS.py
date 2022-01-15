@@ -126,6 +126,20 @@ def isRealisable(solution:list, W:int, objets:dict):
     return getPoidsSol(solution, objets)<=W
 
 def getPoidsSol(solution:list, objets:dict):
+    """Retoune le poids d'une solution (somme des poids des objets pris)
+
+    Parameters
+    ----------
+    solution : list
+        liste des booleens qui indique si un objet est pris ou pas
+    objets : dict
+        dictionnaire des objets
+
+    Returns
+    -------
+    float
+        poids de l'objet
+    """
     poidsSolution=0
     for i,xi in enumerate(solution):
         poidsSolution+=objets[i][0]*xi
@@ -419,4 +433,3 @@ def PLS2(pop_init:list,voisinage,objets:dict,W:int):
     log.write(f"{len(list(objets.values())[0])-1}\n")
     log.close()
     return non_domines_approx
-

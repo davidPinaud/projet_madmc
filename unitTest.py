@@ -81,35 +81,39 @@ def test_PLS(objets_test, W_test):
     """
     nb_solution_dans_popInit=20
     pop_init=genererPopulationInitiale(nb_solution_dans_popInit,objets_test,W_test)
-    print(f"\ngenererPopulationInitiale {pop_init}, longueur {len(pop_init)}")
-    print(f"PLS {PLS(pop_init,voisinage,objets_test,W_test)}")
-    print(f"PLS {PLS2(pop_init,voisinage,objets_test,W_test)}")
+    #print(f"\ngenererPopulationInitiale {pop_init}, longueur {len(pop_init)}")
+    # print(f"PLS {PLS(pop_init,voisinage,objets_test,W_test)}")
+    # print(f"PLS {PLS2(pop_init,voisinage,objets_test,W_test)}")
+    PLS(pop_init,voisinage,objets_test,W_test)
+    PLS2(pop_init,voisinage,objets_test,W_test)
+
+######## TEST BASIQUE ########
+        ###Instance####
+n=2
+p=2
+objets_test, W_test=getInstance(n,p)
+objets_test, W_test,indices_from_objets_random_dict_to_objets=getInstance_withRandomSelection(n,p) #choix aléatoire des objets
+    ###Données Test####
+solution_non_realisable_test1=[1,0,1,1,0]
+solution_non_realisable_test2=[0,0,1,1,1]
+solution_realisable_test1=[1,0,0,1,1]
+solution_realisable_test2=[0,1,0,0,1]
+solution_realisable_test3=[0,0,1,0,1]
+ens_pot_efficace_test1=[solution_realisable_test2,solution_realisable_test3]
+ens_pot_efficace_test2=[solution_realisable_test1]
 
 if __name__== "__main__":
+    
+    # test_basique()
 
-    ######## TEST BASIQUE ########
-        ###Instance####
-    n=5
-    p=4
-    objets_test, W_test=getInstance(n,p)
-    #objets_test, W_test,indices_from_objets_random_dict_to_objets=getInstance_withRandomSelection(n,p) #choix aléatoire des objets
-        ####Données Test####
-    solution_non_realisable_test1=[1,0,1,1,0]
-    solution_non_realisable_test2=[0,0,1,1,1]
-    solution_realisable_test1=[1,0,0,1,1]
-    solution_realisable_test2=[0,1,0,0,1]
-    solution_realisable_test3=[0,0,1,0,1]
-    ens_pot_efficace_test1=[solution_realisable_test2,solution_realisable_test3]
-    ens_pot_efficace_test2=[solution_realisable_test1]
-    #test_basique()
-
-
+    #test_PLS(objets_test, W_test)
     ######## Générer les logs de PLS ########
-    for n in range(41,46):
-        for p in range(1,6):
-            print(f"n {n} p {p}")
-            objets_test, W_test=getInstance(n,p)
-            test_PLS(objets_test, W_test)
+    for n in range(52,101):
+        for p in range(1,5):
+            if n%2==1:
+                print(f"n {n} p {p}")
+                objets_test, W_test=getInstance(n,p)
+                test_PLS(objets_test, W_test)
 
 
     

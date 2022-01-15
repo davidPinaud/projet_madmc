@@ -24,8 +24,8 @@ def getRandomPoids(p:int):
         liste de p poids
     """
     poids=[rand.random() for _ in range(p)]
-    max=np.max(poids)
-    poids=[pi/max for pi in poids]
+    sum=np.sum(poids)
+    poids=[pi/sum for pi in poids]
     return poids
 
 def domSommePonderee(poids,x,y):
@@ -68,7 +68,7 @@ def getMR(PMR,x):
     return max_regret #doublet (solution,regret)
 
 # X: ens des potentiellement non dominés
-def elicitation_incrementale_somme_ponderee(p:int,X:list,nb_pref_connues:int,MMRlimit=0):
+def elicitation_incrementale_somme_ponderee(p:int,X:list,nb_pref_connues:int,MMRlimit=0.001):
     #Poids réels du décideur
     decideur=getRandomPoids(p)
     print(f"décideur {decideur}")
@@ -89,15 +89,18 @@ def elicitation_incrementale_somme_ponderee(p:int,X:list,nb_pref_connues:int,MMR
     MMR=one_question_elicitation_somme_ponderee(X,preference,decideur)
     print(f"x : {MMR[0]}\ny : {MMR[1][0]} : regret : {MMR[1][1]}")
     nb_question=1
+
     while(MMR[1][1]>MMRlimit):
         print(f"itération n° {nb_question+1}\n\n")
-        print(f"x : {MMR[0]}\ny : {MMR[1][0]} : regret : {MMR[1][1]}")
         MMR=one_question_elicitation_somme_ponderee(X,preference,decideur)
+        print(f"x : {MMR[0]}\ny : {MMR[1][0]} : regret : {MMR[1][1]}")
         nb_question+=1
+
     print(f"durée totale {time.time()-start}")
     valeurOPT=0
-    for p,x_i in zip(decideur,MMR[0]):
-        valeurOPT+=float(p)*float(x_i)
+    for p,x_i in zip(decideur,ast.literal_eval(MMR[0])):
+        valeurOPT+=float(p)*x_i
+    print(f"x : {MMR[0]}\ny : {MMR[1][0]}\nregret : {MMR[1][1]}\nvaleurOPT : {valeurOPT}\nnbQuestion : {nb_question} ")
     return MMR[0],nb_question,valeurOPT
 
 

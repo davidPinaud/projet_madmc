@@ -6,6 +6,7 @@ import numpy as np
 import itertools as iter
 from PLS import getEvaluation
 import ast
+import time
 #normaliser : diviser par le premier maximum regret
 
 
@@ -52,6 +53,11 @@ def domSommePonderee(poids,x,y):
         f_y+=p*y_i
     return f_x>f_y
 
+def listEquals(l1,l2):
+    for i,j in zip(l1,l2):
+        if i!=j:
+            return False
+    return True
 def getMR(PMR,x):
     max_regret=""
     for y,regret in PMR[repr(x)].items():
@@ -78,44 +84,71 @@ def elicitation_incrementale_somme_ponderee(p:int,X:list,nb_pref_connues:int,MMR
         else:
             pass
     
-    
-    MMR=one_question_elicitation_somme_ponderee(X,allPairsSolutions,preference,decideur)
+    start=time.time()
+    print(f"itération n°1")
+    MMR=one_question_elicitation_somme_ponderee(X,preference,decideur)
+    print(f"x : {MMR[0]}\ny : {MMR[1][0]} : regret : {MMR[1][1]}")
     nb_question=1
     while(MMR[1][1]>MMRlimit):
+        print(f"itération n° {nb_question+1}\n\n")
         print(f"x : {MMR[0]}\ny : {MMR[1][0]} : regret : {MMR[1][1]}")
-        MMR=one_question_elicitation_somme_ponderee(X,allPairsSolutions,preference,decideur)
+        MMR=one_question_elicitation_somme_ponderee(X,preference,decideur)
         nb_question+=1
-
+    print(f"durée totale {time.time()-start}")
     valeurOPT=0
     for p,x_i in zip(decideur,MMR[0]):
-        valeurOPT+=p*x_i
+        valeurOPT+=float(p)*float(x_i)
     return MMR[0],nb_question,valeurOPT
 
-def one_question_elicitation_somme_ponderee(X,allPairsSolutions,preference,decideur):
+
+def one_question_elicitation_somme_ponderee(X,preference,decideur):
     p=len(decideur) #nb de critère
     PMR={}
     for x in X:
         PMR[repr(x)]={}
-    for x,y in allPairsSolutions: #calcul de PMR(x,y) pour chaque couple de solutions restantes
-        x=np.array(x)
-        y=np.array(y)
-        # Create a new model
-        m = gp.Model("elicitation_somme_ponderee")
-        # Create variables
-        w = m.addMVar(shape=p,vtype=GRB.CONTINUOUS, name="w")
-        # Set objective
-        m.setObjective((y @ w) - (x @ w), GRB.MAXIMIZE)
-        # Add constraints:
-        for i,(x_pref,y_pref) in enumerate(preference):
-            m.addConstr(x_pref @ w >= y_pref @ w,f"contrainte_{i}")
-        # Optimize model
-        m.optimize()
+    for x in X: #calcul de PMR(x,y) pour chaque couple de solutions restantes
+        for y in X:
+            if not listEquals(x,y):
+                x=np.array(x)
+                y=np.array(y)
+                # Create a new model
+                m = gp.Model("elicitation_somme_ponderee")
+                # Create variables
+                w = m.addMVar(shape=p,vtype=GRB.CONTINUOUS, name="w")
+                # Set objective
+                m.setObjective((y @ w) - (x @ w), GRB.MAXIMIZE)
+                # Add constraints:
+                for i,(x_pref,y_pref) in enumerate(preference):
+                    x_pref=np.array(x_pref)
+                    y_pref=np.array(y_pref)
+                    m.addConstr(x_pref @ w >= y_pref @ w,f"contrainte_{i}")
 
-        PMR[repr(x)][repr(y)]=m.ObjVal
+                l=[np.zeros(p) for _ in range(p)]
+                for i,t in enumerate(l):
+                    t[i]=1
+                    m.addConstr(t @ w<=1)
+                    m.addConstr(0<=t @ w)
+                m.addConstr(np.ones(p) @ w==1)
+                # Optimize model
+                m.Params.LogToConsole = 0
+                m.optimize()
+                # print(f"x={x}\n")
+                # print(f"y={y}\n")
+                # print(m.display())
+                if m.status == GRB.INFEASIBLE:
+                    print("MODÈLE INFAISABLE")
+                elif(m.status==GRB.OPTIMAL):
+                    #print(f"Valeur Obj = {m.ObjVal}")
+                    #for v in m.getVars():
+                    #    print(f"{v} = {v.x}")
+                    PMR[repr(list(x))][repr(list(y))]=m.ObjVal #regret
+    
 
     MR={} #dictionnaire de doublet (solution,regret) = (y,regret de prendre x au lieu de y)
     for x in X:
         MR[repr(x)]=getMR(PMR,x)
+    # print("PMR",PMR.items())
+    # print("\nMR",MR.items())
     MMR=min(MR.items(), key=lambda x:x[1][1]) # de la forme (x,(y,regret))
 
     x_etoile=ast.literal_eval(MMR[0])

@@ -96,6 +96,32 @@ def get_all_PLS_logs():
     return allLogs
 
 def get_one_PLS_log(logtype,n,p):
+    """Permet de récuperer tous un des logs générés par les fontions PLS et PLS2
+
+    Parameters
+    ----------
+    logtype: str
+        PLS1 ou PLS2, quel PLS a crée ce log
+    n:int
+        nombre d'objets voulu
+    p:int
+        nombre de critère voulu
+    Returns
+    -------
+    list
+        log qui vérifie les conditions demandées
+        les logs sont des dictionnaires de la forme 
+        {
+            "logType" : str                     # type de PLS utilisé (PLS ou PLS2)
+            "non_domines_approx" : list         # approximation de l'ensemble des non dominés calculé par PLS ou PLS2
+            "fonction_de_voisinage" : str       # nom de la fonction de voisinage utilisé
+            "objets" : dict                     # objets du problème du sac à dos
+            "W" : int                           # capacité du sac à dos  du problème du sac à dos
+            "execution_time" : float            # temps d'éxécution de PLS ou PLS2
+            "n" : int                           # nombre d'objet dans le problème
+            "p" : int                           # nombre d'objectifs dans le problème
+        }
+    """
     dirname = os.path.dirname(__file__)
     for file_name in os.listdir(dirname+"/logs"):
         if file_name.endswith(".txt"):

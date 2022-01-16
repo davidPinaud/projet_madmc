@@ -1,5 +1,5 @@
 from ast import parse
-from instance_loader import getInstance, getInstance_withRandomSelection
+from instance_loader import getInstance
 from PLS import *
 import numpy as np
 

@@ -108,7 +108,7 @@ def get_one_PLS_log(logtype,n,p):
         nombre de critère voulu
     Returns
     -------
-    list
+    dict
         log qui vérifie les conditions demandées
         les logs sont des dictionnaires de la forme 
         {
@@ -274,5 +274,5 @@ def plot_PLS_executionTimes_wrt_n_and_p_3D():
     ax.legend()
     plt.show()
 
-plot_PLS_executionTimes_wrt_n_and_p()
-plot_PLS_executionTimes_wrt_n_and_p_3D()
+# plot_PLS_executionTimes_wrt_n_and_p()
+# plot_PLS_executionTimes_wrt_n_and_p_3D()

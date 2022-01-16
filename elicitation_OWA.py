@@ -1,3 +1,6 @@
+import datetime
+import json
+import os
 from graphs_and_stats import get_one_PLS_log
 import gurobipy as gp
 from gurobipy import GRB
@@ -10,7 +13,7 @@ import time
 from elicitation_ponderee import getMR,getRandomPoids,domSommePonderee,listEquals,getSommePondereeValue
 
     
-def elicitation_incrementale_OWA(p:int,X:list,nb_pref_connues:int,MMRlimit=0.001):
+def elicitation_incrementale_OWA(p:int,X:list,nb_pref_connues:int,MMRlimit=0.001,decideur=None):
     """Permet de lancer l'élicitation incrémentale des préférences d'un décideur choisis au hasard
     dont les préférences sont représentés par un OWA. On fait l'hypothèse qu'on connait un nombre 
     "nb_pref_connues" de préférences du décideur et que les ses poids (au décideur) sont décroissant (on cherche donc des solutions équitables)
@@ -35,9 +38,17 @@ def elicitation_incrementale_OWA(p:int,X:list,nb_pref_connues:int,MMRlimit=0.001
          la valeur pour le décideur de la solution optimale estimée et les poids du décideur
     """
     #Poids réels du décideur
-    decideur=getRandomPoids(p)
+    if decideur==None:
+        decideur=getRandomPoids(p)
     decideur.sort(reverse=True)
     print(f"décideur {decideur}")
+    if(len(X)==1):
+        print("Une seule solution possible dans X ! C'est l'optimal")
+        valeurOPT=0
+        X[0].sort()
+        for p,x_i in zip(decideur,X[0]):
+            valeurOPT+=float(p)*x_i
+        return repr(X[0]),0,valeurOPT,decideur,0
     print(f"nb_pref_connues = {nb_pref_connues}")
     for x in X:
         x.sort()
@@ -70,11 +81,12 @@ def elicitation_incrementale_OWA(p:int,X:list,nb_pref_connues:int,MMRlimit=0.001
     for p,x_i in zip(decideur,ast.literal_eval(MMR[0])):
         valeurOPT+=float(p)*x_i
     print(f"\nFIN:\nx : {MMR[0]}\ny : {MMR[1][0]}\nregret : {MMR[1][1][0]}\nvaleurOPT : {valeurOPT}\nnbQuestion : {nb_question}\n")
-    print(f"durée totale {time.time()-start}")
+    duree=time.time()-start
+    print(f"durée totale {duree}")
     for v in MMR[1][1][1].getVars():
        print(f"{v} = {v.x}")
     print(f"décideur {decideur}")
-    return MMR[0],nb_question,valeurOPT,decideur
+    return MMR[0],nb_question,valeurOPT,decideur,duree
 
 
 def one_question_elicitation_OWA(X,preference,decideur):
@@ -194,26 +206,64 @@ if __name__== "__main__":
     #         objets=log["objets"]
     #         X=[getEvaluation(sol,objets) for sol in nonDom]
     #         break
-    p=3
-    n=20
-    log=get_one_PLS_log("PLS1",n,p)
-    nonDom=log["non_domines_approx"]
-    objets=log["objets"]
-    X=[getEvaluation(sol,objets) for sol in nonDom]
-    
-    solution_optimale_estimee,nb_question,valeur_sol_estimee,decideur=elicitation_incrementale_OWA(p,X,nb_pref_connues=int(np.floor(len(nonDom)*0.20)))
-    
-    solution_optimale,valeur_sol_optimale=getSolutionOptOWA(X,decideur)
+    all_p=list(range(3))
+    all_n=list(range(5,26))
+    for n in all_n:
+        for p in all_p:
+            log_PLS=get_one_PLS_log("PLS1",n,p)
+            nonDom=log_PLS["non_domines_approx"]
+            objets=log_PLS["objets"]
+            X=[getEvaluation(sol,objets) for sol in nonDom]
+            
+            solution_optimale_estimee,nb_question,valeur_sol_estimee,decideur,duree=elicitation_incrementale_OWA(p,X,nb_pref_connues=int(np.floor(len(nonDom)*0.20)))
+            
+            solution_optimale,valeur_sol_optimale=getSolutionOptOWA(X,decideur)
 
-    solution_optimale=[int(e) for e in solution_optimale]
-    solution_optimale_estimee=ast.literal_eval(solution_optimale_estimee)
-    solution_optimale_estimee=[int(e) for e in solution_optimale_estimee]
-    if(listEquals(solution_optimale,solution_optimale_estimee)):
-        print(f"On a trouvé la même solution optimale {solution_optimale} de valeur {valeur_sol_optimale}")
-    else:
-        print(f"Les solutions \"optimale\" et \"optimale estimée\" sont différentes :\n\
-optimale :{solution_optimale} de valeur : {valeur_sol_optimale}\n\
-estimee:{solution_optimale_estimee} de valeur : {valeur_sol_estimee}")
+            solution_optimale=[int(e) for e in solution_optimale]
+            solution_optimale_estimee=ast.literal_eval(solution_optimale_estimee)
+            solution_optimale_estimee=[int(e) for e in solution_optimale_estimee]
+            if(listEquals(solution_optimale,solution_optimale_estimee)):
+                print(f"On a trouvé la même solution optimale {solution_optimale} de valeur {valeur_sol_optimale}")
+            else:
+                print(f"Les solutions \"optimale\" et \"optimale estimée\" sont différentes :\n\
+        optimale :{solution_optimale} de valeur : {valeur_sol_optimale}\n\
+        estimee:{solution_optimale_estimee} de valeur : {valeur_sol_estimee}\n\
+        \nSoit un gap de {100-valeur_sol_estimee*100/valeur_sol_optimale} %")
+
+            dirname = os.path.dirname(__file__)
+            date=str(datetime.datetime.now()).replace(" ", "")
+            filename = os.path.join(dirname+"/logs_OWA", f"OWA_n_{n}_p_{p}_{date}.txt")
+            log=open(filename,'w+')
+            log.write("log\n")
+            log.write(json.dumps(log_PLS))
+            log.write("\n\n")
+            log.write("Evaluations\n")
+            log.write(str(X))
+            log.write("\n\n")
+            log.write("solution_optimale_estimee\n")
+            log.write(str(solution_optimale_estimee))
+            log.write("\n\n")
+            log.write("nb_question\n")
+            log.write(str(nb_question))
+            log.write("\n\n")
+            log.write("valeur_sol_estimee\n")
+            log.write(str(valeur_sol_estimee))
+            log.write("\n\n")
+            log.write("decideur\n")
+            log.write(str(decideur))
+            log.write("\n\n")
+            log.write("solution_optimale\n")
+            log.write(str(solution_optimale))
+            log.write("\n\n")
+            log.write("valeur_sol_optimale\n")
+            log.write(str(valeur_sol_optimale))
+            log.write("\n\n")
+            log.write("duree\n")
+            log.write(str(duree))
+            log.write("\n\n")
+            log.write("gap(%)\n")
+            log.write(str(100-valeur_sol_estimee*100/valeur_sol_optimale))
+            log.close()
     
 
 

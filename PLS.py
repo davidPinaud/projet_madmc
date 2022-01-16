@@ -10,7 +10,6 @@ import random as rand
 from copy import deepcopy
 import os
 import datetime
-import numpy as np
 from time import perf_counter
 
 

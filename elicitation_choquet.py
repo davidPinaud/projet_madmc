@@ -53,7 +53,7 @@ def domChoquet(capacite,x,y):
 
 def getAllSet(p):
     E=[]
-    for k in range(0,p+1):
+    for k in range(0,p):
         A_de_taille_k=list(iter.combinations(range(p),k))
         E+=A_de_taille_k
     return E
@@ -142,12 +142,12 @@ def one_question_elicitation_choquet(X,preference,decideur):
                     if(i==0):
                         choquet_y+=y_i #( on doit faire x1 normalement mais ça sert à rien)
                     else:
-                        choquet_y+=(y_i-x[i-1])*m.getVarByName(f"{list(range(i,p+1))}")
+                        choquet_y+=(y_i-x[i-1])*m.getVarByName(f"{list(range(i,p))}")
                 for i,x_i in enumerate(x):
                     if(i==0):
                         choquet_x+=x_i #( on doit faire x1 normalement mais ça sert à rien)
                     else:
-                        choquet_x+=(x_i-x[i-1])*m.getVarByName(f"{list(range(i,p+1))}")
+                        choquet_x+=(x_i-x[i-1])*m.getVarByName(f"{list(range(i,p))}")
                 m.setObjective(choquet_y-choquet_x, GRB.MAXIMIZE)
                 # Add constraints:
                 for i,(x_pref,y_pref) in enumerate(preference):
@@ -157,18 +157,31 @@ def one_question_elicitation_choquet(X,preference,decideur):
                         if(i==0):
                             choquet_y+=y_i #( on doit faire x1 normalement mais ça sert à rien)
                         else:
-                            choquet_y+=(y_i-x[i-1])*m.getVarByName(f"{list(range(i,p+1))}")
+                            choquet_y+=(y_i-x[i-1])*m.getVarByName(f"{list(range(i,p))}")
                     for i,x_i in enumerate(x_pref):
                         if(i==0):
                             choquet_x+=x_i #( on doit faire x1 normalement mais ça sert à rien)
                         else:
-                            choquet_x+=(x_i-x[i-1])*m.getVarByName(f"{list(range(i,p+1))}")
+                            choquet_x+=(x_i-x[i-1])*m.getVarByName(f"{list(range(i,p))}")
                     m.addConstr(choquet_x >= choquet_y,f"contrainte_{i}")
 
                 m.addConstr(m.getVarByName(f"{[]}")==0)
-                m.addConstr(m.getVarByName(f"{list(range(p+1))}")==0)
+                m.addConstr(m.getVarByName(f"{list(range(p))}")==1)
 
-                ####JUSQUA ICI C'EST BON
+                for i in range(p):
+                    All_A_sans_i=[A for A in E if i not in A]
+                    for A in All_A_sans_i:
+                        A_avec_i=A.copy()
+                        for index,Ai in enumerate(A_avec_i):#il faut mettre le i au bon endroit sinon il ne vas pas reconnaitre la clé
+                            if(index == len(A_avec_i)-1):
+                                A_avec_i.append(i)
+                                break
+                            if(Ai<=i and A_avec_i[index+1]>=i):
+                                A_avec_i.insert(index+1,i)
+                                break
+                        m.addConstr(m.getVarByName(f"{A}")<=m.getVarByName(f"{A_avec_i}"))
+
+                
                 # Optimize model
                 m.Params.LogToConsole = 0
                 m.optimize()
@@ -194,9 +207,9 @@ def one_question_elicitation_choquet(X,preference,decideur):
     x_etoile=ast.literal_eval(MMR[0])
     y_etoile=MMR[1][0]
 
-    if domSommePonderee(decideur,x_etoile,y_etoile):
+    if domChoquet(decideur,x_etoile,y_etoile):
         preference.append((x_etoile,y_etoile))
-    elif domSommePonderee(decideur,y_etoile,x_etoile):
+    elif domChoquet(decideur,y_etoile,x_etoile):
         preference.append((y_etoile,x_etoile))
     else:
         pass
@@ -206,15 +219,15 @@ def one_question_elicitation_choquet(X,preference,decideur):
 
 
 if __name__== "__main__":
-    # p=4
-    # n=18
-    # for log in get_all_PLS_logs():
-    #     if(log["logType"]=="PLS1" and log["n"]==n and log["p"]==p):
-    #         nonDom=log["non_domines_approx"]
-    #         objets=log["objets"]
-    #         X=[getEvaluation(sol,objets) for sol in nonDom]
-    #         break
-
+    p=4
+    n=18
+    for log in get_all_PLS_logs():
+        if(log["logType"]=="PLS1" and log["n"]==n and log["p"]==p):
+            nonDom=log["non_domines_approx"]
+            objets=log["objets"]
+            X=[getEvaluation(sol,objets) for sol in nonDom]
+            break
+    elicitation_incrementale_choquet(p,X,nb_pref_connues=int(np.floor(len(nonDom)*0.20)))
 
 
     # elicitation_incrementale_somme_ponderee(p,X,nb_pref_connues=int(np.floor(len(nonDom)*0.20)))

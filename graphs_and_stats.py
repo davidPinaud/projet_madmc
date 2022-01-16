@@ -95,6 +95,75 @@ def get_all_PLS_logs():
                 allLogs.append(log)
     return allLogs
 
+def get_one_PLS_log(logtype,n,p):
+    dirname = os.path.dirname(__file__)
+    for file_name in os.listdir(dirname+"/logs"):
+        if file_name.endswith(".txt"):
+            file_elems=file_name.split("_")
+            if(file_elems[0]==logtype and file_elems[2]==str(n) and file_elems[4]==str(p) ):
+                file_characteristic={
+                    "PLS_type":file_elems[0],
+                    "n":int(file_elems[2]),
+                    "p":int(file_elems[4]),
+                }
+                log={}
+                log_file_path=os.path.join(dirname+"/logs", file_name)
+                with open(log_file_path) as PLS_log:
+                    line=PLS_log.readline()
+                    while line:
+                        line=line.strip()
+                        if(line=="logType"):
+                            logType=PLS_log.readline().strip()
+                            log["logType"]=file_characteristic["PLS_type"]
+                            PLS_log.readline()
+                            line=PLS_log.readline()
+                            continue
+                        if(line=="non_domines_approx"):
+                            non_domines_approx=ast.literal_eval(PLS_log.readline())
+                            log["non_domines_approx"]=non_domines_approx
+                            PLS_log.readline()
+                            line=PLS_log.readline()
+                            continue
+                        if(line=="fonction de voisinage"):
+                            fonction_de_voisinage=PLS_log.readline().strip()
+                            log["fonction_de_voisinage"]=fonction_de_voisinage
+                            PLS_log.readline()
+                            line=PLS_log.readline()
+                            continue
+                        if(line=="objets"):
+                            objets=ast.literal_eval(PLS_log.readline())
+                            log["objets"]=objets
+                            PLS_log.readline()
+                            line=PLS_log.readline()
+                            continue
+                        if(line=="capacité max"):
+                            W=int(float(PLS_log.readline()))
+                            log["W"]=W
+                            PLS_log.readline()
+                            line=PLS_log.readline()
+                            continue
+                        if(line=="execution_time"):
+                            execution_time=float(PLS_log.readline())
+                            log["execution_time"]=execution_time
+                            PLS_log.readline()
+                            PLS_log.readline()
+                            line=PLS_log.readline()
+                            continue
+                        if(line=="n"):
+                            n=int(float(PLS_log.readline()))
+                            log["n"]=n
+                            PLS_log.readline()
+                            PLS_log.readline()
+                            line=PLS_log.readline()
+                            continue
+                        if(line=="p"):
+                            p=int(float(PLS_log.readline()))
+                            log["p"]=p
+                            PLS_log.readline()
+                            line=PLS_log.readline()
+                            continue
+                return(log)
+
 def plot_PLS_executionTimes_wrt_n_and_p():
     """Permet de plotter 2 graphes avec les temps d'éxécutions de PLS et PLS2 en fonction de n et p et leurs moyennes
     """

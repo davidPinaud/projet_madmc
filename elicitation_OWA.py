@@ -1,4 +1,4 @@
-from graphs_and_stats import get_all_PLS_logs
+from graphs_and_stats import get_one_PLS_log
 import gurobipy as gp
 from gurobipy import GRB
 import random as rand
@@ -7,10 +7,33 @@ import itertools as iter
 from PLS import getEvaluation
 import ast
 import time
-from elicitation_ponderee import getMR,getRandomPoids,domSommePonderee,listEquals
+from elicitation_ponderee import getMR,getRandomPoids,domSommePonderee,listEquals,getSommePondereeValue
 
     
 def elicitation_incrementale_OWA(p:int,X:list,nb_pref_connues:int,MMRlimit=0.001):
+    """Permet de lancer l'élicitation incrémentale des préférences d'un décideur choisis au hasard
+    dont les préférences sont représentés par un OWA. On fait l'hypothèse qu'on connait un nombre 
+    "nb_pref_connues" de préférences du décideur et que les ses poids (au décideur) sont décroissant (on cherche donc des solutions équitables)
+
+    Parameters
+    ----------
+    p : int
+        nombre de critère
+    X : list
+        liste des solutions à considérer, ce sont des solutions potentiellement pareto optimales calculés avec PLS
+    nb_pref_connues : int
+        nombre de préférences connues du décideur
+    MMRlimit : float, optional
+        limite sur laquelle on arrête l'élicitation, cette valeur doit être supérieure ou égale à 0
+        car quand MMR<0, cela voudrait dire qu'il existe une solution que l'on regrettera jamais de prendre
+        c'est à dire que c'est la solution optimale, by default 0.001
+
+    Returns
+    -------
+    list, int, float, list
+        La solution optimale estimée, le nombre de question posé,
+         la valeur pour le décideur de la solution optimale estimée et les poids du décideur
+    """
     #Poids réels du décideur
     decideur=getRandomPoids(p)
     decideur.sort(reverse=True)
@@ -33,28 +56,52 @@ def elicitation_incrementale_OWA(p:int,X:list,nb_pref_connues:int,MMRlimit=0.001
     start=time.time()
     print(f"itération n°1")
     MMR=one_question_elicitation_OWA(X,preference,decideur)  #MMR de la forme (x,(y,(regret,model)))
-    print(f"x : {MMR[0]}\ny : {MMR[1][0]} : regret : {MMR[1][1][0]}")
+    print(f"Question : \nx : {MMR[0]}\ny : {MMR[1][0]}\nregret : {MMR[1][1][0]}")
     nb_question=1
 
     while(MMR[1][1][0]>MMRlimit):
         print(f"\nitération n° {nb_question+1}\n")
         MMR=one_question_elicitation_OWA(X,preference,decideur)
-        print(f"x : {MMR[0]}\ny : {MMR[1][0]} : regret : {MMR[1][1][0]}")
+        print(f"Question : \nx : {MMR[0]}\ny : {MMR[1][0]}\nregret : {MMR[1][1][0]}")
         nb_question+=1
 
     
     valeurOPT=0
     for p,x_i in zip(decideur,ast.literal_eval(MMR[0])):
         valeurOPT+=float(p)*x_i
-    print(f"\nFIN:\nx : {MMR[0]}\ny : {MMR[1][0]}\nregret : {MMR[1][1][0]}\nvaleurOPT : {valeurOPT}\nnbQuestion : {nb_question} ")
+    print(f"\nFIN:\nx : {MMR[0]}\ny : {MMR[1][0]}\nregret : {MMR[1][1][0]}\nvaleurOPT : {valeurOPT}\nnbQuestion : {nb_question}\n")
     print(f"durée totale {time.time()-start}")
     for v in MMR[1][1][1].getVars():
        print(f"{v} = {v.x}")
     print(f"décideur {decideur}")
-    return MMR[0],nb_question,valeurOPT
+    return MMR[0],nb_question,valeurOPT,decideur
 
 
 def one_question_elicitation_OWA(X,preference,decideur):
+    """Permet de :
+    - calculer les PMR
+    - en déduire les MR
+    - en déduire le MMR
+    - en déduire la question, la poser et agir en conséquences sur l'espaces des poids
+    C'est en fait une étape de l'élicitation : trouver la meilleure question qui va le plus 
+    couper l'espace des poids et la poser.
+
+    Parameters
+    ----------
+    X : list
+        liste de toutes les solutions potentiellement pareto optimale trouvées avec PLS
+    preference : list
+        liste de doublet qui indique les préférences du décideur entre des solutions de X
+    decideur : list
+        liste des poids du décideur
+
+    Returns
+    -------
+    tuple
+        renvoi un tuple de la forme (x,(y,(regret,modèle))) avec x le MMR, y le "meilleur adversaire de x"
+        (celui auquel il faut poser la question au décideur s'il préfère x ou y), regret le regret de prendre x
+        au lieu de y et modèle le modèle (PL) qui a permi de calculer ce regret
+    """
     p=len(decideur) #nb de critère
     PMR={}
     for x in X:
@@ -118,20 +165,55 @@ def one_question_elicitation_OWA(X,preference,decideur):
     return MMR
 
 
+def getSolutionOptOWA(X:list,poids_decideur:list):
+    """Retourne la solution optimale si les préférences du décideur est
+    modélisé par un OWA
+    Parameters
+    ----------
+    X : list
+        liste de toutes les solutions potentiellement pareto optimale trouvées avec PLS
+    poids_decideur : list
+        liste des poids du décideur
 
+    Returns
+    -------
+    tuple
+        double de la forme (solution optimale, valeur de la solution optimale pour le décideur)
+    """
+    for x in X:
+        x.sort()
+    valeursSP=[(x,getSommePondereeValue(poids_decideur,x)) for x in X]
+    return max(valeursSP,key=lambda x:x[1])
 
 if __name__== "__main__":
-    p=4
-    n=18
-    for log in get_all_PLS_logs():
-        if(log["logType"]=="PLS1" and log["n"]==n and log["p"]==p):
-            nonDom=log["non_domines_approx"]
-            objets=log["objets"]
-            X=[getEvaluation(sol,objets) for sol in nonDom]
-            break
+    # p=4
+    # n=18
+    # for log in get_all_PLS_logs():
+    #     if(log["logType"]=="PLS1" and log["n"]==n and log["p"]==p):
+    #         nonDom=log["non_domines_approx"]
+    #         objets=log["objets"]
+    #         X=[getEvaluation(sol,objets) for sol in nonDom]
+    #         break
+    p=3
+    n=20
+    log=get_one_PLS_log("PLS1",n,p)
+    nonDom=log["non_domines_approx"]
+    objets=log["objets"]
+    X=[getEvaluation(sol,objets) for sol in nonDom]
     
-    elicitation_incrementale_somme_ponderee(p,X,nb_pref_connues=int(np.floor(len(nonDom)*0.20)))
-    #elicitation_incrementale_OWA(p,X,nb_pref_connues=int(np.floor(len(nonDom)*0.20)))
+    solution_optimale_estimee,nb_question,valeur_sol_estimee,decideur=elicitation_incrementale_OWA(p,X,nb_pref_connues=int(np.floor(len(nonDom)*0.20)))
+    
+    solution_optimale,valeur_sol_optimale=getSolutionOptOWA(X,decideur)
 
+    solution_optimale=[int(e) for e in solution_optimale]
+    solution_optimale_estimee=ast.literal_eval(solution_optimale_estimee)
+    solution_optimale_estimee=[int(e) for e in solution_optimale_estimee]
+    if(listEquals(solution_optimale,solution_optimale_estimee)):
+        print(f"On a trouvé la même solution optimale {solution_optimale} de valeur {valeur_sol_optimale}")
+    else:
+        print(f"Les solutions \"optimale\" et \"optimale estimée\" sont différentes :\n\
+optimale :{solution_optimale} de valeur : {valeur_sol_optimale}\n\
+estimee:{solution_optimale_estimee} de valeur : {valeur_sol_estimee}")
+    
 
 

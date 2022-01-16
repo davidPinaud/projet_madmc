@@ -10,7 +10,8 @@ def test_1_mise_a_jour_ens_potentiellement_efficace(verbose=False):
     if(verbose):
         print("\navant candidature",ens_pot_efficace_test1, "candidat : ",solution_realisable_test1)
         print("après candidature, hasChanged : ", hasChanged," et nouvel ens :",ens_pot_efficace,"\n")
-    return hasChanged==True and ens_pot_efficace==[solution_realisable_test1]
+    assert hasChanged
+    assert ens_pot_efficace==[solution_realisable_test1]
 
 def test_2_mise_a_jour_ens_potentiellement_efficace(verbose=False):
     """test si quand un candidat dominé par au moins un sol pot eff arrive, on le rajoute pas et on efface rien
@@ -19,34 +20,34 @@ def test_2_mise_a_jour_ens_potentiellement_efficace(verbose=False):
     if(verbose):
         print("\navant candidature",ens_pot_efficace_test2, "candidat : ",solution_realisable_test2)
         print("après candidature, hasChanged : ", hasChanged," et nouvel ens :",ens_pot_efficace,"\n")
-    return hasChanged==False and ens_pot_efficace==[solution_realisable_test1]
+    assert not hasChanged
+    assert ens_pot_efficace==[solution_realisable_test1]
 
 def test_isDomFaible():
     """test la dominance faible de pareto >=
     """
-    cond= True==isDomFaible(solution_realisable_test1,solution_realisable_test2,objets_test)
-    cond = cond and False==isDomFaible(solution_realisable_test2,solution_realisable_test1,objets_test)
-    cond = cond and False==isDomFaible(solution_realisable_test2,solution_realisable_test3,objets_test)
-    cond = cond and False==isDomFaible(solution_realisable_test3,solution_realisable_test2,objets_test)
-    return cond
+    assert isDomFaible(solution_realisable_test1,solution_realisable_test2,objets_test)
+    assert not isDomFaible(solution_realisable_test2,solution_realisable_test1,objets_test)
+    assert not isDomFaible(solution_realisable_test2,solution_realisable_test3,objets_test)
+    assert not isDomFaible(solution_realisable_test3,solution_realisable_test2,objets_test)
+
 
 def test_isDom():
     """test la dominance de pareto >
     """
-    cond= True==isDom(solution_realisable_test1,solution_realisable_test2,objets_test)
-    cond = cond and False==isDom(solution_realisable_test2,solution_realisable_test1,objets_test)
-    cond = cond and False==isDomStrict(solution_realisable_test2,solution_realisable_test3,objets_test)
-    cond = cond and False==isDomStrict(solution_realisable_test3,solution_realisable_test2,objets_test)
-    return cond
+    assert isDom(solution_realisable_test1,solution_realisable_test2,objets_test)
+    assert not isDom(solution_realisable_test2,solution_realisable_test1,objets_test)
+    assert not isDomStrict(solution_realisable_test2,solution_realisable_test3,objets_test)
+    assert not isDomStrict(solution_realisable_test3,solution_realisable_test2,objets_test)
 
 def test_isDomStrict():
     """test la dominance stricte de pareto >>
     """
-    cond=True==isDomStrict(solution_realisable_test1,solution_realisable_test2,objets_test)
-    cond = cond and False==isDomStrict(solution_realisable_test2,solution_realisable_test1,objets_test)
-    cond = cond and False==isDomStrict(solution_realisable_test2,solution_realisable_test3,objets_test)
-    cond = cond and False==isDomStrict(solution_realisable_test3,solution_realisable_test2,objets_test)
-    return cond
+    assert isDomStrict(solution_realisable_test1,solution_realisable_test2,objets_test)
+    assert not isDomStrict(solution_realisable_test2,solution_realisable_test1,objets_test)
+    assert not isDomStrict(solution_realisable_test2,solution_realisable_test3,objets_test)
+    assert not isDomStrict(solution_realisable_test3,solution_realisable_test2,objets_test)
+
 
 def test_basique():
     """Permet de tester si les fonctions basiques et utilitaires ont les bons comportements
@@ -87,33 +88,33 @@ def test_PLS(objets_test, W_test):
     PLS(pop_init,voisinage,objets_test,W_test)
     PLS2(pop_init,voisinage,objets_test,W_test)
 
-######## TEST BASIQUE ########
-        ###Instance####
-n=2
-p=2
-objets_test, W_test=getInstance(n,p)
-objets_test, W_test,indices_from_objets_random_dict_to_objets=getInstance_withRandomSelection(n,p) #choix aléatoire des objets
-    ###Données Test####
-solution_non_realisable_test1=[1,0,1,1,0]
-solution_non_realisable_test2=[0,0,1,1,1]
-solution_realisable_test1=[1,0,0,1,1]
-solution_realisable_test2=[0,1,0,0,1]
-solution_realisable_test3=[0,0,1,0,1]
-ens_pot_efficace_test1=[solution_realisable_test2,solution_realisable_test3]
-ens_pot_efficace_test2=[solution_realisable_test1]
+
 
 if __name__== "__main__":
-    
-    # test_basique()
+    ######## TEST BASIQUE ########
+        ###Instance####
+    n=5
+    p=3
+    objets_test, W_test=getInstance(n,p)
+    #objets_test, W_test,indices_from_objets_random_dict_to_objets=getInstance_withRandomSelection(n,p) #choix aléatoire des objets
+        ###Données Test####
+    solution_non_realisable_test1=[1,0,1,1,0]
+    solution_non_realisable_test2=[0,0,1,1,1]
+    solution_realisable_test1=[1,0,0,1,1]
+    solution_realisable_test2=[0,1,0,0,1]
+    solution_realisable_test3=[0,0,1,0,1]
+    ens_pot_efficace_test1=[solution_realisable_test2,solution_realisable_test3]
+    ens_pot_efficace_test2=[solution_realisable_test1]
+    test_basique()
 
     #test_PLS(objets_test, W_test)
     ######## Générer les logs de PLS ########
-    for n in range(52,101):
-        for p in range(1,5):
-            if n%2==1:
-                print(f"n {n} p {p}")
-                objets_test, W_test=getInstance(n,p)
-                test_PLS(objets_test, W_test)
+    # for n in range(52,101):
+    #     for p in range(1,5):
+    #         if n%2==1:
+    #             print(f"n {n} p {p}")
+    #             objets_test, W_test=getInstance(n,p)
+    #             test_PLS(objets_test, W_test)
 
 
     

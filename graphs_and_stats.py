@@ -492,4 +492,4 @@ def plot_RL_elicitation_executionTimes_wrt_n_and_p_3D():
 
 #TODO faire les fonctions pour grapher temps exe, gap et nbQuestion pour elicitation avec recherche locale
 #TODO écrire rapport
-#preparer prez
+#TODO preparer prez

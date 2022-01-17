@@ -206,7 +206,7 @@ if __name__== "__main__":
     #         objets=log["objets"]
     #         X=[getEvaluation(sol,objets) for sol in nonDom]
     #         break
-    all_p=list(range(3))
+    all_p=[5]
     all_n=list(range(5,26))
     for n in all_n:
         for p in all_p:

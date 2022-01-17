@@ -1,0 +1,29 @@
+log
+{"logType": "PLS1", "non_domines_approx": [[1, 0, 0, 1, 1]], "fonction_de_voisinage": "voisinage", "objets": {"0": [394, 783, 840], "1": [911, 198, 798], "2": [768, 278, 335], "3": [477, 629, 554], "4": [513, 952, 365]}, "W": 1531, "execution_time": 3.447500000000603e-05, "n": 5, "p": 2}
+
+Evaluations
+[[1759, 2364]]
+
+solution_optimale_estimee
+[1759, 2364]
+
+nb_question
+0
+
+valeur_sol_estimee
+1981.2975176128534
+
+decideur
+[0.6325660865903254, 0.36743391340967463]
+
+solution_optimale
+[1759, 2364]
+
+valeur_sol_optimale
+1981.2975176128534
+
+duree
+0
+
+gap(%)
+0.0

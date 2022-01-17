@@ -1,3 +1,4 @@
+from audioop import maxpp
 import datetime
 import enum
 import json
@@ -162,7 +163,7 @@ def elicitation_incrementale_choquet(p:int,X:list,nb_pref_connues:int,MMRlimit=0
     print(f"décideur {decideur}")
     if(len(X)==1):
         print("Une seule solution possible dans X ! C'est l'optimal")
-        valeurOPT=getChoquetValue(decideur,[float(e) for e in X[0]])
+        valeurOPT=getChoquetValue(decideur,X[0])
         return repr(X[0]),0,valeurOPT,decideur,0
     print(f"nb_pref_connues = {nb_pref_connues}")
     for x in X:
@@ -194,11 +195,12 @@ def elicitation_incrementale_choquet(p:int,X:list,nb_pref_connues:int,MMRlimit=0
     
     valeurOPT=getChoquetValue(decideur,[float(e) for e in ast.literal_eval(MMR[0])])
     print(f"\nFIN:\nx : {MMR[0]}\ny : {MMR[1][0]}\nregret : {MMR[1][1][0]}\nvaleurOPT : {valeurOPT}\nnbQuestion : {nb_question}\n")
-    print(f"durée totale {time.time()-start}")
+    duree=time.time()-start
+    print(f"durée totale {duree}")
     for v in MMR[1][1][1].getVars():
        print(f"{v} = {v.x}")
     #print(f"décideur {decideur}")
-    return MMR[0],nb_question,valeurOPT,decideur
+    return MMR[0],nb_question,valeurOPT,decideur,duree
 
 
 def one_question_elicitation_choquet(X,preference,decideur):
@@ -361,7 +363,7 @@ if __name__== "__main__":
     #         break
     # elicitation_incrementale_choquet(p,X,nb_pref_connues=int(np.floor(len(nonDom)*0.20)))
 
-    all_p=list(range(3))
+    all_p=[5]
     all_n=list(range(5,26))
     for n in all_n:
         for p in all_p:
@@ -370,7 +372,7 @@ if __name__== "__main__":
             objets=log_PLS["objets"]
             X=[getEvaluation(sol,objets) for sol in nonDom]
             
-            solution_optimale_estimee,nb_question,valeur_sol_estimee,decideur,duree=elicitation_incrementale_choquet(p,X,nb_pref_connues=int(np.floor(len(nonDom)*0.20)))
+            solution_optimale_estimee,nb_question,valeur_sol_estimee,decideur,duree=elicitation_incrementale_choquet(p,X,nb_pref_connues=max(int(np.floor(len(nonDom)*0.20)),p+1))
             
             solution_optimale,valeur_sol_optimale=getSolutionOptChoquet(X,decideur)
 

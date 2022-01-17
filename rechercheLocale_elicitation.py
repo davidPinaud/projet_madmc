@@ -1,3 +1,4 @@
+import ast
 import json
 from time import perf_counter
 import os
@@ -15,22 +16,22 @@ def rechercheLocale_plus_elicitation(objets, W, sol_init:list,voisinage,n:int,p:
     
     if elicitation_name in ["SP","OWA","Choquet"]:
         if(verbose):
-            print(f"\nElicitation avec {elicitation_name}")
+            print(f"\nElicitation avec {elicitation_name}, n={n}, p={p}")
         if elicitation_name=="SP":
             decideur=getRandomPoids(p)
-            return compute_RL_plus_elicitation(sol_init,voisinage,n,p,elicitation_incrementale_somme_ponderee,objets,W,decideur,getSommePondereeValue,verbose)
+            return compute_RL_plus_elicitation(sol_init,voisinage,n,p,elicitation_incrementale_somme_ponderee,objets,W,decideur,getSommePondereeValue,verbose,elicitation_name)
         elif elicitation_name=="OWA":
             decideur=getRandomPoids(p)
             decideur.sort(reverse=True)
-            return compute_RL_plus_elicitation(sol_init,voisinage,n,p,elicitation_incrementale_OWA,objets,W,decideur,getSommePondereeValue,verbose)
+            return compute_RL_plus_elicitation(sol_init,voisinage,n,p,elicitation_incrementale_OWA,objets,W,decideur,getSommePondereeValue,verbose,elicitation_name)
         elif elicitation_name=="Choquet":
             decideur=getRandomCapacite(p)
-            return compute_RL_plus_elicitation(sol_init,voisinage,n,p,elicitation_incrementale_choquet,objets,W,decideur,getChoquetValue,verbose)
+            return compute_RL_plus_elicitation(sol_init,voisinage,n,p,elicitation_incrementale_choquet,objets,W,decideur,getChoquetValue,verbose,elicitation_name)
     else:
         print("elicitation_name doit être égal à SP,OWA ou Choquet")
         return None
 
-def compute_RL_plus_elicitation(sol_init:list,voisinage,n,p:int,elicitation_function,objets, W, decideur,valeur_function,verbose=True):
+def compute_RL_plus_elicitation(sol_init:list,voisinage,n,p:int,elicitation_function,objets, W, decideur,valeur_function,verbose=True,elicitation_name=""):
     
     MMRlimit=0.001
     log_all_iteration={
@@ -38,7 +39,7 @@ def compute_RL_plus_elicitation(sol_init:list,voisinage,n,p:int,elicitation_func
             "sol_init":sol_init,
             "voisinage":voisinage,
             "p":p,
-            "elicitation_function":elicitation_function,
+            "elicitation_function":elicitation_name,
             "W":W,
             "decideur":decideur,
             "valeur_function":valeur_function
@@ -47,7 +48,9 @@ def compute_RL_plus_elicitation(sol_init:list,voisinage,n,p:int,elicitation_func
     ite_counter=0
     sol_courante=sol_init.copy()
     optNotFound=True
-    while(optNotFound):
+    ite_limit=100
+    sol_courante_avant=None
+    while(optNotFound and ite_counter<ite_limit):
     #=====================start itération=====================
         t1_start = perf_counter()
         log_one_iteration={}
@@ -63,12 +66,16 @@ def compute_RL_plus_elicitation(sol_init:list,voisinage,n,p:int,elicitation_func
             X.append(eval)
             sol_to_eval[repr(sol)]=eval
             if(eval not in list(eval_to_sol.keys())):
-                eval_to_sol[repr(eval)]=sol
+                if (elicitation_name=="OWA" or elicitation_name=="Choquet"):
+                    eval.sort()
+                    eval_to_sol[repr(eval)]=sol
+                else:
+                    eval_to_sol[repr(eval)]=sol
             else:
                 print("\n\n\nERREUR: deux solutions on exactement les mêmes performances\n\n\n")
                 return None
         #calculer nombre de préférences connus du décideur
-        nb_pref_connues=int(np.floor(len(list_voisin)*0.20))
+        nb_pref_connues=max(int(np.floor(len(list_voisin)*0.20)),min(p+2,len(X)-1))
         #elicitation
         solution_OPT_estimee,nb_question,valeur_sol_opt_estimee,decideur,duree=elicitation_function(p,X,nb_pref_connues,MMRlimit,decideur)
 
@@ -77,9 +84,16 @@ def compute_RL_plus_elicitation(sol_init:list,voisinage,n,p:int,elicitation_func
         #logger l'iteration
         log_one_iteration["sol_courante"]=sol_courante
         log_one_iteration["perf_sol_courante"]=sol_to_eval[repr(sol_courante)]
-        log_one_iteration["valeur_sol_courante"]=valeur_function(decideur,sol_courante)
+        log_one_iteration["valeur_sol_courante"]=valeur_function(decideur,getEvaluation(sol_courante,objets))
 
-        log_one_iteration["sol_solution_OPT_estimee"]=eval_to_sol[solution_OPT_estimee]
+        if(solution_OPT_estimee in eval_to_sol.keys()):
+            log_one_iteration["sol_solution_OPT_estimee"]=eval_to_sol[solution_OPT_estimee]
+        else:
+            temp=ast.literal_eval(solution_OPT_estimee).copy()
+            temp.reverse()
+            solution_OPT_estimee=repr(temp)
+            print("\n\nkeys",eval_to_sol.keys())
+            log_one_iteration["sol_solution_OPT_estimee"]=eval_to_sol[solution_OPT_estimee]
         log_one_iteration["solution_OPT_estimee"]=solution_OPT_estimee
         log_one_iteration["valeur_sol_opt_estimee"]=valeur_sol_opt_estimee
 
@@ -90,8 +104,12 @@ def compute_RL_plus_elicitation(sol_init:list,voisinage,n,p:int,elicitation_func
         log_one_iteration["nb_question"]=nb_question
         log_one_iteration["dureeElicitation"]=duree
         log_one_iteration["dureeIteration"]=t1_stop-t1_start
-
-        if(eval_to_sol[solution_OPT_estimee]==sol_courante):#on a trouvé le opt
+        if(sol_courante_avant is not None and eval_to_sol[solution_OPT_estimee]==sol_courante_avant):#phénomène d'oscillation
+            if verbose:
+                print("\n\n=======Optimum trouvé=======\n\n")
+            optNotFound=False
+            log_one_iteration["changement_sol_courante"]=False
+        elif(eval_to_sol[solution_OPT_estimee]==sol_courante):#on a trouvé le opt
             if verbose:
                 print("\n\n=======Optimum trouvé=======\n\n")
             optNotFound=False
@@ -99,6 +117,7 @@ def compute_RL_plus_elicitation(sol_init:list,voisinage,n,p:int,elicitation_func
         else: #la solution trouvée est meilleure que la solution courante, on change de solution courante
             if verbose:
                 print(f"\n\n=======Changement de solution courante, maintenant ={eval_to_sol[solution_OPT_estimee]} d'évaluation {solution_OPT_estimee} et de valeur {valeur_sol_opt_estimee}=======\n\n")
+            sol_courante_avant=sol_courante
             sol_courante=eval_to_sol[solution_OPT_estimee]
             log_one_iteration["changement_sol_courante"]=True
 
@@ -114,18 +133,19 @@ en {ite_counter} itération(s)")
 
     dirname = os.path.dirname(__file__)
     date=str(datetime.datetime.now()).replace(" ", "")
-    filename = os.path.join(dirname+"/logs_RL_elici", f"RL_elici_n_{n}_p_{p}_f_{elicitation_function}_{date}.txt")
+    filename = os.path.join(dirname+f"/logs_RL_elici/{elicitation_name}", f"RL_elici_n_{n}_p_{p}_f_{elicitation_name}_{date}.txt")
     log=open(filename,'w+')
     log.write(repr(log_all_iteration))
     log.close()
+    print(f"FIN ELICITATION AVEC {elicitation_name}")
     return sol_courante,solution_OPT_estimee,log_one_iteration['valeur_sol_courante'],ite_counter,log_all_iteration,decideur
 
 
 if __name__== "__main__":
-    n=30
-    p=3
-    objets, W=getInstance(n,p)
-    sol_init=genererSolutionInitiale(objets, W)
-    rechercheLocale_plus_elicitation(objets, W, sol_init,voisinage,n,p,elicitation_name="SP",verbose=True)
-    #rechercheLocale_plus_elicitation(objets, W, sol_init,voisinage,n,p,elicitation_name="OWA",verbose=True)
-    #rechercheLocale_plus_elicitation(objets, W, sol_init,voisinage,n,p,elicitation_name="Choquet",verbose=True)
+    for n in range(5,26):
+        for p in range(3,5):
+            objets, W=getInstance(n,p)
+            sol_init=genererSolutionInitiale(objets, W)
+            #rechercheLocale_plus_elicitation(objets, W, sol_init,voisinage,n,p,elicitation_name="SP",verbose=True)
+            #rechercheLocale_plus_elicitation(objets, W, sol_init,voisinage,n,p,elicitation_name="OWA",verbose=True)
+            rechercheLocale_plus_elicitation(objets, W, sol_init,voisinage,n,p,elicitation_name="Choquet",verbose=True)

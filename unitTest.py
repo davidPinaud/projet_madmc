@@ -1,7 +1,7 @@
+#Auteur : David PINAUD
 from ast import parse
 from instance_loader import getInstance
 from PLS import *
-import numpy as np
 
 def test_1_mise_a_jour_ens_potentiellement_efficace(verbose=False):
     """test si quand un candidat non dominé par les sols pot eff arrive, on le rajoute bien et on efface bien les nouveaux dominées

@@ -1,9 +1,11 @@
-from audioop import maxpp
+#Auteur : David PINAUD
+
 import datetime
-import enum
 import json
 import os
-from graphs_and_stats import get_one_PLS_log
+
+from sqlalchemy import false
+from graphs_and_stats import get_one_PLS_log,get_Elicitation_log_from_path
 import gurobipy as gp
 from gurobipy import GRB
 import random as rand
@@ -106,7 +108,7 @@ def getAllSet(p):
     return [list(e) for e in E]
 
 def getRandomCapacite(p:int):
-    """Retourne une capacité totalement aléatoire
+    """Retourne une capacité convexe totalement aléatoire
 
     Parameters
     ----------
@@ -118,22 +120,58 @@ def getRandomCapacite(p:int):
     capacite
         une capacité aléatoire
     """
-    capacite=Capacite(p)
-    capacite.set_cap([],0)
-    values=[rand.random() for _ in range(2**p-2)]
-    values.sort()
-    i=0
+    FirstIte=True
+    isConvex=False
+    while(FirstIte or not isConvex):
+        FirstIte=False
+        capacite=Capacite(p)
+        capacite.set_cap([],0)
+        values=[rand.random() for _ in range(2**p-2)]
+        values.sort()
+        i=0
+        for k in range(1,p):
+            A_de_taille_k=list(iter.combinations(range(p),k))
+            local_values=values.copy()[i:i+len(A_de_taille_k)]
+            i+=len(local_values)
+            rand.shuffle(local_values)
+            for j,A in enumerate(A_de_taille_k):
+                capacite.set_cap(list(A),local_values[j])
+        capacite.set_cap(list(range(p)),1)
+        isConvex=isCapacityConvex(capacite,p)
+    print("Capacité OK")
+    return capacite
+def isCapacityConvex(capacite,p):
+    """Vérifie qu'une capacité est bien convexe
+
+    Parameters
+    ----------
+    capacite : Capacite
+        capacite à tester
+    p : int
+        taille du plus grand ensemble de la capacité
+
+    Returns
+    -------
+    boolean
+        True si la capacité est convexe, False sinon
+    """
     for k in range(1,p):
         A_de_taille_k=list(iter.combinations(range(p),k))
-        local_values=values.copy()[i:i+len(A_de_taille_k)]
-        i+=len(local_values)
-        rand.shuffle(local_values)
-        for j,A in enumerate(A_de_taille_k):
-            capacite.set_cap(list(A),local_values[j])
-    capacite.set_cap(list(range(p)),1)
-    return capacite
+        for ens in list(iter.combinations(A_de_taille_k,2)):
+            A=list(ens[0])
+            B=list(ens[0])
+            A_et_B=set(A.copy()).intersection(set(B.copy()))
+            A_ou_B=set(A.copy()).union(set(B.copy()))
+            vA_et_B=capacite.get_value(list(A_et_B))
+            vA_ou_B=capacite.get_value(list(A_ou_B))
+            vA=capacite.get_value(A)
+            vB=capacite.get_value(B)
+            if(vA_et_B+vA_ou_B<vA+vB):
+                return False
+    return True
 
-def elicitation_incrementale_choquet(p:int,X:list,nb_pref_connues:int,MMRlimit=0.001,decideur=None):
+
+def elicitation_incrementale_choquet(p:int,X:list,nb_pref_connues:int,MMRlimit=0.1,decideur=None):
     """Permet de lancer l'élicitation incrémentale des préférences d'un décideur choisis au hasard
     dont les préférences sont représentés par le critère de choquet. On fait l'hypothèse qu'on connait un nombre 
     "nb_pref_connues" de préférences du décideur
@@ -149,7 +187,7 @@ def elicitation_incrementale_choquet(p:int,X:list,nb_pref_connues:int,MMRlimit=0
     MMRlimit : float, optional
         limite sur laquelle on arrête l'élicitation, cette valeur doit être supérieure ou égale à 0
         car quand MMR<0, cela voudrait dire qu'il existe une solution que l'on regrettera jamais de prendre
-        c'est à dire que c'est la solution optimale, by default 0.001
+        c'est à dire que c'est la solution optimale, by default 0.1
 
     Returns
     -------
@@ -187,6 +225,10 @@ def elicitation_incrementale_choquet(p:int,X:list,nb_pref_connues:int,MMRlimit=0
     nb_question=1
 
     while(MMR[1][1][0]>MMRlimit):
+        if(nb_question>=50):
+            MMRlimit=1
+        if(nb_question>=100):
+            MMRlimit=2
         print(f"\nitération n° {nb_question+1}\n")
         MMR=one_question_elicitation_choquet(X,preference,decideur)
         print(f"Question : \nx : {MMR[0]}\ny : {MMR[1][0]}\nregret : {MMR[1][1][0]}")
@@ -247,12 +289,12 @@ def one_question_elicitation_choquet(X,preference,decideur):
                 # Set objective
                 choquet_y=0
                 choquet_x=0
-                for i,y_i in enumerate(x):
+                for i,y_i in enumerate(y):
                     if(i==0):
                         choquet_y+=y_i #( on doit faire x1 normalement mais ça sert à rien)
                     else:
                         #choquet_y+=(y_i-x[i-1])*m.getVarByName(f"{list(range(i,p))}")
-                        choquet_y+=(y_i-x[i-1])*vars[repr(list(range(i,p)))]
+                        choquet_y+=(y_i-y[i-1])*vars[repr(list(range(i,p)))]
                 for i,x_i in enumerate(x):
                     if(i==0):
                         choquet_x+=x_i #( on doit faire x1 normalement mais ça sert à rien)
@@ -264,17 +306,19 @@ def one_question_elicitation_choquet(X,preference,decideur):
                 for i,(x_pref,y_pref) in enumerate(preference):
                     x_pref=np.array(x_pref)
                     y_pref=np.array(y_pref)
+                    choquet_y_pref=0
+                    choquet_x_pref=0
                     for i,y_i in enumerate(y_pref):
                         if(i==0):
-                            choquet_y+=y_i #( on doit faire x1 normalement mais ça sert à rien)
+                            choquet_y_pref+=y_i #( on doit faire x1 normalement mais ça sert à rien)
                         else:
-                            choquet_y+=(y_i-x[i-1])*vars[repr(list(range(i,p)))]
+                            choquet_y_pref+=(y_i-y_pref[i-1])*vars[repr(list(range(i,p)))]
                     for i,x_i in enumerate(x_pref):
                         if(i==0):
-                            choquet_x+=x_i #( on doit faire x1 normalement mais ça sert à rien)
+                            choquet_x_pref+=x_i #( on doit faire x1 normalement mais ça sert à rien)
                         else:
-                            choquet_x+=(x_i-x[i-1])*vars[repr(list(range(i,p)))]
-                    m.addConstr(choquet_x >= choquet_y,f"contrainte_{i}")
+                            choquet_x_pref+=(x_i-x_pref[i-1])*vars[repr(list(range(i,p)))]
+                    m.addConstr(choquet_x_pref >= choquet_y_pref,f"contrainte_{i}")
 
                 # m.addConstr(m.getVarByName(f"{[]}")==0)
                 # m.addConstr(m.getVarByName(f"{list(range(p))}")==1)
@@ -352,74 +396,129 @@ def getSolutionOptChoquet(X:list,capacite_decideur:list):
     valeursChoquet=[(x,getChoquetValue(capacite_decideur,x)) for x in X]
     return max(valeursChoquet,key=lambda x:x[1])
 
+def update_RealOptSolutionChoquet(cheminLog):
+    log=get_Elicitation_log_from_path(cheminLog)
+
+    PLS_log=log["PLS_log"]
+    objets=PLS_log["objets"]
+    W=PLS_log["W"]
+    n=PLS_log["n"]
+    p=PLS_log["p"]
+    decideur_raw=log["decideur"]
+
+    decideur=Capacite(p)
+    for A,vA in decideur_raw.items():
+        decideur.set_cap(ast.literal_eval(A),vA)
+    choquetPerformances=[]
+    for poids_et_perf in objets.values():
+        perf_sorted=poids_et_perf[1:].copy()
+        perf_sorted.sort()
+        choquetPerformances.append(sum([perf_sorted[0]]+[(perf_sorted[i]-perf_sorted[i-1])*decideur.get_value(list(range(i,p))) for i in range(1,len(perf_sorted))]))
+    choquetPerformances=np.array(choquetPerformances)
+    poids=np.array([v[0] for v in objets.values()])
+    #création du modèle
+    m = gp.Model(f"opt_Choquet")
+    x=m.addMVar(shape=n,vtype=GRB.BINARY, name="x")
+    
+    m.setObjective(choquetPerformances @ x, GRB.MAXIMIZE)
+    m.addConstr(poids @ x <= W,f"contrainte_poids")
+    m.optimize()
+
+    if m.status == GRB.INFEASIBLE:
+        print("MODÈLE INFAISABLE")
+    elif(m.status==GRB.OPTIMAL):
+        print(f"Valeur Obj = {m.ObjVal}")
+        for v in m.getVars():
+           print(f"{v} = {v.x}")
+        #perf_solution_opt=[v.x*perf for v,perf in zip(m.getVars(),OWA_performances)]
+        perf_solution_opt=[]
+        performances=[v[1:] for v in objets.values()]
+        for critere in range(p):
+            perf=0
+            for i,v in enumerate(m.getVars()):
+                perf+=int(v.x)*performances[i][critere]
+            perf_solution_opt.append(perf)
+                
+        with open(cheminLog,mode='a') as log_file:
+            log_file.write("\n")
+            log_file.write("\n")
+            log_file.write("real_opt\n")
+            log_file.write(str(m.ObjVal)+"\n")
+            log_file.write("\n")
+            log_file.write("real_gap\n")
+            log_file.write(str(max(0,100-float(log["valeur_sol_estimee"])*100/m.ObjVal))+"\n")
+            log_file.write("\n")
+            log_file.write("real_solution_opt\n")
+            log_file.write(str(perf_solution_opt))
+
+
+def update_log_Choquet(log_dirname="/logs_Choquet"):
+    dirname = os.path.dirname(__file__)
+    for file_name in os.listdir(dirname+log_dirname):
+        if file_name.endswith(".txt"):
+            log_file_path=os.path.join(dirname+log_dirname, file_name)
+            update_RealOptSolutionChoquet(log_file_path)
+
+
 if __name__== "__main__":
-    # p=4
-    # n=18
-    # for log in get_all_PLS_logs():
-    #     if(log["logType"]=="PLS1" and log["n"]==n and log["p"]==p):
-    #         nonDom=log["non_domines_approx"]
-    #         objets=log["objets"]
-    #         X=[getEvaluation(sol,objets) for sol in nonDom]
-    #         break
-    # elicitation_incrementale_choquet(p,X,nb_pref_connues=int(np.floor(len(nonDom)*0.20)))
+    p=4
+    n=18
 
-    all_p=[5]
-    all_n=list(range(5,26))
-    for n in all_n:
-        for p in all_p:
-            log_PLS=get_one_PLS_log("PLS1",n,p)
-            nonDom=log_PLS["non_domines_approx"]
-            objets=log_PLS["objets"]
-            X=[getEvaluation(sol,objets) for sol in nonDom]
-            
-            solution_optimale_estimee,nb_question,valeur_sol_estimee,decideur,duree=elicitation_incrementale_choquet(p,X,nb_pref_connues=max(int(np.floor(len(nonDom)*0.20)),p+1))
-            
-            solution_optimale,valeur_sol_optimale=getSolutionOptChoquet(X,decideur)
+    log_PLS=get_one_PLS_log("PLS1",n,p)
+    nonDom=log_PLS["non_domines_approx"]
+    objets=log_PLS["objets"]
+    X=[getEvaluation(sol,objets) for sol in nonDom]
+    
+    solution_optimale_estimee,nb_question,valeur_sol_estimee,decideur,duree=elicitation_incrementale_choquet(p,X,nb_pref_connues=max(int(np.floor(len(nonDom)*0.20)),p+1))
+    
+    solution_optimale,valeur_sol_optimale=getSolutionOptChoquet(X,decideur)
 
-            solution_optimale=[int(e) for e in solution_optimale]
-            solution_optimale_estimee=ast.literal_eval(solution_optimale_estimee)
-            solution_optimale_estimee=[int(e) for e in solution_optimale_estimee]
-            if(listEquals(solution_optimale,solution_optimale_estimee)):
-                print(f"\nOn a trouvé la même solution optimale {solution_optimale} de valeur {valeur_sol_optimale}")
-            else:
-                print(f"\nLes solutions \"optimale\" et \"optimale estimée\" sont différentes :\n\
-        optimale :{solution_optimale} de valeur : {valeur_sol_optimale}\n\
-        estimee:{solution_optimale_estimee} de valeur : {valeur_sol_estimee}\n\
-        \nSoit un gap de {100-valeur_sol_estimee*100/valeur_sol_optimale} %")
+    solution_optimale=[int(e) for e in solution_optimale]
+    solution_optimale_estimee=ast.literal_eval(solution_optimale_estimee)
+    solution_optimale_estimee=[int(e) for e in solution_optimale_estimee]
+    if(listEquals(solution_optimale,solution_optimale_estimee)):
+        print(f"\nOn a trouvé la même solution optimale {solution_optimale} de valeur {valeur_sol_optimale}")
+    else:
+        print(f"\nLes solutions \"optimale\" et \"optimale estimée\" sont différentes :\n\
+optimale :{solution_optimale} de valeur : {valeur_sol_optimale}\n\
+estimee:{solution_optimale_estimee} de valeur : {valeur_sol_estimee}\n\
+\nSoit un gap de {100-valeur_sol_estimee*100/valeur_sol_optimale} %")
+    
+    dirname = os.path.dirname(__file__)
+    date=str(datetime.datetime.now()).replace(" ", "")
+    filename = os.path.join(dirname+"/logs_Choquet", f"Choquet_n_{n}_p_{p}_{date}.txt")
+    log=open(filename,'w+')
+    log.write("log\n")
+    log.write(json.dumps(log_PLS))
+    log.write("\n\n")
+    log.write("Evaluations\n")
+    log.write(str(X))
+    log.write("\n\n")
+    log.write("solution_optimale_estimee\n")
+    log.write(str(solution_optimale_estimee))
+    log.write("\n\n")
+    log.write("nb_question\n")
+    log.write(str(nb_question))
+    log.write("\n\n")
+    log.write("valeur_sol_estimee\n")
+    log.write(str(valeur_sol_estimee))
+    log.write("\n\n")
+    log.write("decideur\n")
+    log.write(str(decideur))
+    log.write("\n\n")
+    log.write("solution_optimale\n")
+    log.write(str(solution_optimale))
+    log.write("\n\n")
+    log.write("valeur_sol_optimale\n")
+    log.write(str(valeur_sol_optimale))
+    log.write("\n\n")
+    log.write("duree\n")
+    log.write(str(duree))
+    log.write("\n\n")
+    log.write("gap(%)\n")
+    log.write(str(100-valeur_sol_estimee*100/valeur_sol_optimale))
+    log.close()
+    update_RealOptSolutionChoquet(filename)
             
-            dirname = os.path.dirname(__file__)
-            date=str(datetime.datetime.now()).replace(" ", "")
-            filename = os.path.join(dirname+"/logs_Choquet", f"Choquet_n_{n}_p_{p}_{date}.txt")
-            log=open(filename,'w+')
-            log.write("log\n")
-            log.write(json.dumps(log_PLS))
-            log.write("\n\n")
-            log.write("Evaluations\n")
-            log.write(str(X))
-            log.write("\n\n")
-            log.write("solution_optimale_estimee\n")
-            log.write(str(solution_optimale_estimee))
-            log.write("\n\n")
-            log.write("nb_question\n")
-            log.write(str(nb_question))
-            log.write("\n\n")
-            log.write("valeur_sol_estimee\n")
-            log.write(str(valeur_sol_estimee))
-            log.write("\n\n")
-            log.write("decideur\n")
-            log.write(str(decideur))
-            log.write("\n\n")
-            log.write("solution_optimale\n")
-            log.write(str(solution_optimale))
-            log.write("\n\n")
-            log.write("valeur_sol_optimale\n")
-            log.write(str(valeur_sol_optimale))
-            log.write("\n\n")
-            log.write("duree\n")
-            log.write(str(duree))
-            log.write("\n\n")
-            log.write("gap(%)\n")
-            log.write(str(100-valeur_sol_estimee*100/valeur_sol_optimale))
-            log.close()
-
+    # update_log_Choquet(log_dirname="/logs_Choquet_pour_moyenne")
 

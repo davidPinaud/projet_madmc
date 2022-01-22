@@ -1,6 +1,8 @@
+#Auteur : David PINAUD
 import datetime
 import os
-from graphs_and_stats import get_one_PLS_log
+from re import I
+from graphs_and_stats import get_one_PLS_log, all_elicitation_logs,get_Elicitation_log_from_path
 import gurobipy as gp
 from gurobipy import GRB
 import random as rand
@@ -10,7 +12,8 @@ from PLS import getEvaluation
 import ast
 import time
 import json
-#normaliser : diviser par le premier maximum regret
+
+
 
 def getSommePondereeValue(poids:list,x:list):
     """Permet de calculer la somme de x pondérée par poids
@@ -125,7 +128,7 @@ def getMR(PMR,x):
     return max_regret #doublet (solution,(regret,m))
 
 def elicitation_incrementale_somme_ponderee(p:int,X:list,nb_pref_connues:int,MMRlimit=0.001,decideur=None):
-    """Permet de lancer l'élicitation incrémentale des préférences d'un décideur choisis au hasard
+    """Permet de lancer l'élicitation incrémentale des préférences d'un décideur choisi au hasard
     dont les préférences sont représentés par une somme pondérée. On fait l'hypothèse qu'on connait un nombre 
     "nb_pref_connues" de préférences du décideur
 
@@ -300,76 +303,126 @@ def getSolutionOptSP(X:list,poids_decideur:list):
     valeursSP=[(x,getSommePondereeValue(poids_decideur,x)) for x in X]
     return max(valeursSP,key=lambda x:x[1])
 
-if __name__== "__main__":
-    # p=4
-    # n=18
-    # for log in get_all_PLS_logs():
-    #     if(log["logType"]=="PLS1" and log["n"]==n and log["p"]==p):
-    #         nonDom=log["non_domines_approx"]
-    #         objets=log["objets"]
-    #         X=[getEvaluation(sol,objets) for sol in nonDom]
-    #         break
+def update_RealOptSolutionSP(cheminLog):
+    log=get_Elicitation_log_from_path(cheminLog)
 
-    all_p=[5]
-    all_n=list(range(5,26))
-    for n in all_n:
-        for p in all_p:
-            print(f"n : {n}")
-            print(f"p : {p}")
-            log_PLS=get_one_PLS_log("PLS1",n,p)
-            nonDom=log_PLS["non_domines_approx"]
-            objets=log_PLS["objets"]
-            X=[getEvaluation(sol,objets) for sol in nonDom]
-            
-            solution_optimale_estimee,nb_question,valeur_sol_estimee,decideur,duree=elicitation_incrementale_somme_ponderee(p,X,nb_pref_connues=int(np.floor(len(nonDom)*0.20)))
-            
-            solution_optimale,valeur_sol_optimale=getSolutionOptSP(X,decideur)
+    PLS_log=log["PLS_log"]
+    objets=PLS_log["objets"]
+    W=PLS_log["W"]
+    n=PLS_log["n"]
+    p=PLS_log["p"]
+    decideur=np.array(log["decideur"])
 
-            solution_optimale=[int(e) for e in solution_optimale]
-            solution_optimale_estimee=ast.literal_eval(solution_optimale_estimee)
-            solution_optimale_estimee=[int(e) for e in solution_optimale_estimee]
-            if(listEquals(solution_optimale,solution_optimale_estimee)):
-                print(f"On a trouvé la même solution optimale {solution_optimale} de valeur {valeur_sol_optimale}")
-            else:
-                print(f"Les solutions \"optimale\" et \"optimale estimée\" sont différentes :\n\
-        optimale :{solution_optimale} de valeur : {valeur_sol_optimale}\n\
-        estimee:{solution_optimale_estimee} de valeur : {valeur_sol_estimee}\n\
-        \nSoit un gap de {100-valeur_sol_estimee*100/valeur_sol_optimale} %")
+    SP_performances=[]
+    for poids_et_perf in objets.values():
+        SP_performances.append(getSommePondereeValue(decideur,poids_et_perf[1:]))
+    SP_performances=np.array(SP_performances)
+    poids=np.array([v[0] for v in objets.values()])
+    #création du modèle
+    m = gp.Model(f"opt_SP")
+    x=m.addMVar(shape=n,vtype=GRB.BINARY, name="x")
+    m.setObjective((SP_performances @ x), GRB.MAXIMIZE)
+    m.addConstr(poids @ x <= W,f"contrainte_poids")
+    m.optimize()
 
-            dirname = os.path.dirname(__file__)
-            date=str(datetime.datetime.now()).replace(" ", "")
-            filename = os.path.join(dirname+"/logs_SP", f"SP_n_{n}_p_{p}_{date}.txt")
-            log=open(filename,'w+')
-            log.write("log\n")
-            log.write(json.dumps(log_PLS))
-            log.write("\n\n")
-            log.write("Evaluations\n")
-            log.write(str(X))
-            log.write("\n\n")
-            log.write("solution_optimale_estimee\n")
-            log.write(str(solution_optimale_estimee))
-            log.write("\n\n")
-            log.write("nb_question\n")
-            log.write(str(nb_question))
-            log.write("\n\n")
-            log.write("valeur_sol_estimee\n")
-            log.write(str(valeur_sol_estimee))
-            log.write("\n\n")
-            log.write("decideur\n")
-            log.write(str(decideur))
-            log.write("\n\n")
-            log.write("solution_optimale\n")
-            log.write(str(solution_optimale))
-            log.write("\n\n")
-            log.write("valeur_sol_optimale\n")
-            log.write(str(valeur_sol_optimale))
-            log.write("\n\n")
-            log.write("duree\n")
-            log.write(str(duree))
-            log.write("\n\n")
-            log.write("gap(%)\n")
-            log.write(str(100-valeur_sol_estimee*100/valeur_sol_optimale))
-            log.close()
+    if m.status == GRB.INFEASIBLE:
+        print("MODÈLE INFAISABLE")
+    elif(m.status==GRB.OPTIMAL):
+        print(f"Valeur Obj = {m.ObjVal}")
+        for v in m.getVars():
+           print(f"{v} = {v.x}")
+        #perf_solution_opt=[v.x*perf for v,perf in zip(m.getVars(),SP_performances)]
+        perf_solution_opt=[]
+        performances=[v[1:] for v in objets.values()]
+        for critere in range(p):
+            perf=0
+            for i,v in enumerate(m.getVars()):
+                perf+=int(v.x)*performances[i][critere]
+            perf_solution_opt.append(perf)
+                
+        with open(cheminLog,mode='a') as log_file:
+            log_file.write("\n")
+            log_file.write("\n")
+            log_file.write("real_opt\n")
+            log_file.write(str(m.ObjVal)+"\n")
+            log_file.write("\n")
+            log_file.write("real_gap\n")
+            log_file.write(str(100-float(log["valeur_sol_estimee"])*100/m.ObjVal)+"\n")
+            log_file.write("\n")
+            log_file.write("real_solution_opt\n")
+            log_file.write(str(perf_solution_opt))
 
 
+def update_log_SP(log_dirname="/logs_SP"):
+    dirname = os.path.dirname(__file__)
+    for file_name in os.listdir(dirname+log_dirname):
+        if file_name.endswith(".txt"):
+            log_file_path=os.path.join(dirname+log_dirname, file_name)
+            update_RealOptSolutionSP(log_file_path)
+
+
+
+if __name__== "__main__":    
+    n=15
+    p=4
+
+    print(f"n : {n}")
+    print(f"p : {p}")
+    log_PLS=get_one_PLS_log("PLS1",n,p)
+    nonDom=log_PLS["non_domines_approx"]
+    objets=log_PLS["objets"]
+    X=[getEvaluation(sol,objets) for sol in nonDom]
+    
+    solution_optimale_estimee,nb_question,valeur_sol_estimee,decideur,duree=elicitation_incrementale_somme_ponderee(p,X,nb_pref_connues=int(np.floor(len(nonDom)*0.20)))
+    
+    solution_optimale,valeur_sol_optimale=getSolutionOptSP(X,decideur)
+
+    solution_optimale=[int(e) for e in solution_optimale]
+    solution_optimale_estimee=ast.literal_eval(solution_optimale_estimee)
+    solution_optimale_estimee=[int(e) for e in solution_optimale_estimee]
+    if(listEquals(solution_optimale,solution_optimale_estimee)):
+        print(f"On a trouvé la même solution optimale {solution_optimale} de valeur {valeur_sol_optimale}")
+    else:
+        print(f"Les solutions \"optimale\" et \"optimale estimée\" sont différentes :\n\
+optimale :{solution_optimale} de valeur : {valeur_sol_optimale}\n\
+estimee:{solution_optimale_estimee} de valeur : {valeur_sol_estimee}\n\
+\nSoit un gap de {100-valeur_sol_estimee*100/valeur_sol_optimale} %")
+
+    dirname = os.path.dirname(__file__)
+    date=str(datetime.datetime.now()).replace(" ", "")
+    filename = os.path.join(dirname+"/logs_SP", f"SP_n_{n}_p_{p}_{date}.txt")
+    log=open(filename,'w+')
+    log.write("log\n")
+    log.write(json.dumps(log_PLS))
+    log.write("\n\n")
+    log.write("Evaluations\n")
+    log.write(str(X))
+    log.write("\n\n")
+    log.write("solution_optimale_estimee\n")
+    log.write(str(solution_optimale_estimee))
+    log.write("\n\n")
+    log.write("nb_question\n")
+    log.write(str(nb_question))
+    log.write("\n\n")
+    log.write("valeur_sol_estimee\n")
+    log.write(str(valeur_sol_estimee))
+    log.write("\n\n")
+    log.write("decideur\n")
+    log.write(str(decideur))
+    log.write("\n\n")
+    log.write("solution_optimale\n")
+    log.write(str(solution_optimale))
+    log.write("\n\n")
+    log.write("valeur_sol_optimale\n")
+    log.write(str(valeur_sol_optimale))
+    log.write("\n\n")
+    log.write("duree\n")
+    log.write(str(duree))
+    log.write("\n\n")
+    log.write("gap(%)\n")
+    log.write(str(100-valeur_sol_estimee*100/valeur_sol_optimale))
+    log.close()
+    update_RealOptSolutionSP(filename)
+    #update_log_SP()
+    
 

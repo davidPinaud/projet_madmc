@@ -27,3 +27,12 @@ duree
 
 gap(%)
 0.0
+
+real_opt
+2476.1302703693727
+
+real_gap
+10.66533981065946
+
+real_solution_opt
+[2452, 2121]

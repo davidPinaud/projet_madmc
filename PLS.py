@@ -11,8 +11,7 @@ from copy import deepcopy
 import os
 import datetime
 from time import perf_counter
-
-
+from instance_loader import getInstance
 
 def getEvaluation(solution:list,objets:dict):
     """Retourne l'évaluation d'une solution donnée
@@ -432,3 +431,15 @@ def PLS2(pop_init:list,voisinage,objets:dict,W:int):
     log.write(f"{len(list(objets.values())[0])-1}\n")
     log.close()
     return non_domines_approx
+
+if __name__== "__main__":
+    n=15
+    p=3
+    objets_test, W_test=getInstance(n,p)
+    nb_solution_dans_popInit=20
+    pop_init=genererPopulationInitiale(nb_solution_dans_popInit,objets_test,W_test)
+    print(f"\n\nn={n} p={p}\npopulation initiale : {pop_init}, longueur {len(pop_init)}")
+    print(f"non dominés de PLS1 : {PLS(pop_init,voisinage,objets_test,W_test)}")
+    print(f"non dominés de PLS2 : {PLS2(pop_init,voisinage,objets_test,W_test)}")
+    print("Logs sauvegardés dans ./logs")
+    

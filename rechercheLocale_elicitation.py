@@ -1,5 +1,6 @@
+#Auteur : David PINAUD
+
 import ast
-import json
 from time import perf_counter
 import os
 import datetime
@@ -9,8 +10,13 @@ import numpy as np
 from elicitation_ponderee import elicitation_incrementale_somme_ponderee,getRandomPoids,getSommePondereeValue
 from elicitation_OWA import elicitation_incrementale_OWA
 from elicitation_choquet import elicitation_incrementale_choquet,getRandomCapacite,getChoquetValue
+import copy
+from graphs_and_stats import all_RL_elici_logs
+import gurobipy as gp
+from gurobipy import GRB
 
-def rechercheLocale_plus_elicitation(objets, W, sol_init:list,voisinage,n:int,p:int,elicitation_name:str,verbose=True): #Approximation des points non-dominés
+
+def rechercheLocale_plus_elicitation(objets, W, sol_init:list,voisinage,n:int,p:int,elicitation_name:str,verbose=True,pourMoyenne=False): #Approximation des points non-dominés
     #set up
     print(("\n\n"))
     
@@ -19,25 +25,27 @@ def rechercheLocale_plus_elicitation(objets, W, sol_init:list,voisinage,n:int,p:
             print(f"\nElicitation avec {elicitation_name}, n={n}, p={p}")
         if elicitation_name=="SP":
             decideur=getRandomPoids(p)
-            return compute_RL_plus_elicitation(sol_init,voisinage,n,p,elicitation_incrementale_somme_ponderee,objets,W,decideur,getSommePondereeValue,verbose,elicitation_name)
+            return compute_RL_plus_elicitation(sol_init,voisinage,n,p,elicitation_incrementale_somme_ponderee,objets,W,decideur,getSommePondereeValue,verbose,elicitation_name,pourMoyenne)
         elif elicitation_name=="OWA":
             decideur=getRandomPoids(p)
             decideur.sort(reverse=True)
-            return compute_RL_plus_elicitation(sol_init,voisinage,n,p,elicitation_incrementale_OWA,objets,W,decideur,getSommePondereeValue,verbose,elicitation_name)
+            return compute_RL_plus_elicitation(sol_init,voisinage,n,p,elicitation_incrementale_OWA,objets,W,decideur,getSommePondereeValue,verbose,elicitation_name,pourMoyenne)
         elif elicitation_name=="Choquet":
             decideur=getRandomCapacite(p)
-            return compute_RL_plus_elicitation(sol_init,voisinage,n,p,elicitation_incrementale_choquet,objets,W,decideur,getChoquetValue,verbose,elicitation_name)
+            return compute_RL_plus_elicitation(sol_init,voisinage,n,p,elicitation_incrementale_choquet,objets,W,decideur,getChoquetValue,verbose,elicitation_name,pourMoyenne)
     else:
         print("elicitation_name doit être égal à SP,OWA ou Choquet")
         return None
 
-def compute_RL_plus_elicitation(sol_init:list,voisinage,n,p:int,elicitation_function,objets, W, decideur,valeur_function,verbose=True,elicitation_name=""):
+def compute_RL_plus_elicitation(sol_init:list,voisinage,n:int,p:int,elicitation_function,objets, W, decideur,valeur_function,verbose=True,elicitation_name="",pourMoyenne=False):
     
     MMRlimit=0.001
     log_all_iteration={
         "parameters" : {
             "sol_init":sol_init,
+            "objets":objets,
             "voisinage":voisinage,
+            "n":n,
             "p":p,
             "elicitation_function":elicitation_name,
             "W":W,
@@ -125,27 +133,129 @@ def compute_RL_plus_elicitation(sol_init:list,voisinage,n,p:int,elicitation_func
         ite_counter+=1
         
     if verbose:
-        print(eval_to_sol)
-        print(f"\n\nUne solution localement optimale a été trouvée :{sol_courante} de performance {solution_OPT_estimee} et de valeur {log_one_iteration['valeur_sol_courante']}\n\
-en {ite_counter} itération(s)")
+        print(f"\n\nUne solution localement optimale a été trouvée :{sol_courante} de performance {solution_OPT_estimee} et de valeur {log_one_iteration['valeur_sol_courante']} en {ite_counter} itération(s)")
         
     #=====================end itération=====================
 
     dirname = os.path.dirname(__file__)
     date=str(datetime.datetime.now()).replace(" ", "")
-    filename = os.path.join(dirname+f"/logs_RL_elici/{elicitation_name}", f"RL_elici_n_{n}_p_{p}_f_{elicitation_name}_{date}.txt")
+    if pourMoyenne :
+        filename = os.path.join(dirname+f"/logs_RL_elici/{elicitation_name}_pour_moyenne", f"RL_elici_n_{n}_p_{p}_f_{elicitation_name}_{date}.txt")
+    else:
+        filename = os.path.join(dirname+f"/logs_RL_elici/{elicitation_name}", f"RL_elici_n_{n}_p_{p}_f_{elicitation_name}_{date}.txt")
+    if(elicitation_name=="SP"):
+        real_opt,real_solution_opt=getRealOptSolutionSP(objets,W,p,n,decideur)
+    elif(elicitation_name=="OWA"):
+        real_opt,real_solution_opt=getRealOptSolutionOWA(objets,W,p,n,decideur)
+    else:
+        real_opt,real_solution_opt=getRealOptSolutionChoquet(objets,W,p,n,decideur)
+    real_gap=100-float(log_one_iteration["valeur_sol_opt_estimee"])*100/real_opt
+    log_all_iteration["real_opt"]=real_opt
+    log_all_iteration["real_solution_opt"]=real_solution_opt
+    log_all_iteration["real_gap"]=real_gap
+    print(f"\ngap : {max(0,real_gap)}<-------\n")
     log=open(filename,'w+')
     log.write(repr(log_all_iteration))
     log.close()
-    print(f"FIN ELICITATION AVEC {elicitation_name}")
+    print(f"=====FIN ELICITATION AVEC {elicitation_name}======\n\n")
     return sol_courante,solution_OPT_estimee,log_one_iteration['valeur_sol_courante'],ite_counter,log_all_iteration,decideur
 
+def getRealOptSolutionSP(objets,W,p,n,decideur):
+    SP_performances=[]
+    for poids_et_perf in objets.values():
+        SP_performances.append(getSommePondereeValue(decideur,poids_et_perf[1:]))
+    SP_performances=np.array(SP_performances)
+    poids=np.array([v[0] for v in objets.values()])
+    #création du modèle
+    m = gp.Model(f"opt_SP")
+    x=m.addMVar(shape=n,vtype=GRB.BINARY, name="x")
+    m.setObjective((SP_performances @ x), GRB.MAXIMIZE)
+    m.addConstr(poids @ x <= W,f"contrainte_poids")
+    m.optimize()
+
+    if m.status == GRB.INFEASIBLE:
+        print("MODÈLE INFAISABLE")
+    elif(m.status==GRB.OPTIMAL):
+        print(f"Valeur Obj = {m.ObjVal}")
+        for v in m.getVars():
+           print(f"{v} = {v.x}")
+        #perf_solution_opt=[v.x*perf for v,perf in zip(m.getVars(),SP_performances)]
+        perf_solution_opt=[]
+        performances=[v[1:] for v in objets.values()]
+        for critere in range(p):
+            perf=0
+            for i,v in enumerate(m.getVars()):
+                perf+=int(v.x)*performances[i][critere]
+            perf_solution_opt.append(perf)
+    return m.ObjVal,perf_solution_opt
+def getRealOptSolutionOWA(objets,W,p,n,decideur):
+    decideur.sort()
+    OWA_performances=[]
+    for poids_et_perf in objets.values():
+        perf_sorted=poids_et_perf[1:].copy()
+        perf_sorted.sort()
+        OWA_performances.append(getSommePondereeValue(decideur,perf_sorted))
+    OWA_performances=np.array(OWA_performances)
+    poids=np.array([v[0] for v in objets.values()])
+    #création du modèle
+    m = gp.Model(f"opt_SP")
+    x=m.addMVar(shape=n,vtype=GRB.BINARY, name="x")
+    m.setObjective((OWA_performances @ x), GRB.MAXIMIZE)
+    m.addConstr(poids @ x <= W,f"contrainte_poids")
+    m.optimize()
+
+    if m.status == GRB.INFEASIBLE:
+        print("MODÈLE INFAISABLE")
+    elif(m.status==GRB.OPTIMAL):
+        print(f"Valeur Obj = {m.ObjVal}")
+        for v in m.getVars():
+           print(f"{v} = {v.x}")
+        #perf_solution_opt=[v.x*perf for v,perf in zip(m.getVars(),OWA_performances)]
+        perf_solution_opt=[]
+        performances=[v[1:] for v in objets.values()]
+        for critere in range(p):
+            perf=0
+            for i,v in enumerate(m.getVars()):
+                perf+=int(v.x)*performances[i][critere]
+            perf_solution_opt.append(perf)
+    return m.ObjVal,perf_solution_opt
+def getRealOptSolutionChoquet(objets,W,p,n,decideur):
+    choquetPerformances=[]
+    for poids_et_perf in objets.values():
+        perf_sorted=poids_et_perf[1:].copy()
+        perf_sorted.sort()
+        choquetPerformances.append(sum([perf_sorted[0]]+[(perf_sorted[i]-perf_sorted[i-1])*decideur.get_value(list(range(i,p))) for i in range(1,len(perf_sorted))]))
+    choquetPerformances=np.array(choquetPerformances)
+    poids=np.array([v[0] for v in objets.values()])
+    #création du modèle
+    m = gp.Model(f"opt_Choquet")
+    x=m.addMVar(shape=n,vtype=GRB.BINARY, name="x")
+    
+    m.setObjective(choquetPerformances @ x, GRB.MAXIMIZE)
+    m.addConstr(poids @ x <= W,f"contrainte_poids")
+    m.optimize()
+
+    if m.status == GRB.INFEASIBLE:
+        print("MODÈLE INFAISABLE")
+    elif(m.status==GRB.OPTIMAL):
+        print(f"Valeur Obj = {m.ObjVal}")
+        for v in m.getVars():
+           print(f"{v} = {v.x}")
+        #perf_solution_opt=[v.x*perf for v,perf in zip(m.getVars(),OWA_performances)]
+        perf_solution_opt=[]
+        performances=[v[1:] for v in objets.values()]
+        for critere in range(p):
+            perf=0
+            for i,v in enumerate(m.getVars()):
+                perf+=int(v.x)*performances[i][critere]
+            perf_solution_opt.append(perf)
+    return m.ObjVal,perf_solution_opt
 
 if __name__== "__main__":
-    for n in range(5,26):
-        for p in range(3,5):
-            objets, W=getInstance(n,p)
-            sol_init=genererSolutionInitiale(objets, W)
-            #rechercheLocale_plus_elicitation(objets, W, sol_init,voisinage,n,p,elicitation_name="SP",verbose=True)
-            #rechercheLocale_plus_elicitation(objets, W, sol_init,voisinage,n,p,elicitation_name="OWA",verbose=True)
-            rechercheLocale_plus_elicitation(objets, W, sol_init,voisinage,n,p,elicitation_name="Choquet",verbose=True)
+    n=13
+    p=3
+    objets, W=getInstance(n,p)
+    sol_init=genererSolutionInitiale(objets, W)
+    rechercheLocale_plus_elicitation(objets, W, copy.deepcopy(sol_init),voisinage,n,p,elicitation_name="SP",verbose=True,pourMoyenne=False)
+    rechercheLocale_plus_elicitation(objets, W, copy.deepcopy(sol_init),voisinage,n,p,elicitation_name="OWA",verbose=True,pourMoyenne=False)
+    rechercheLocale_plus_elicitation(objets, W, copy.deepcopy(sol_init),voisinage,n,p,elicitation_name="Choquet",verbose=True,pourMoyenne=False)

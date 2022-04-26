@@ -1,9 +1,9 @@
 # Projet 
 Projet pour la matière MADMC (Modèles et Algorithmes en Décision et Multicritère et Collective) sur l'élicitation de plusieurs modèles multicritères (OWA, Somme pondérée et Intégrale de Choquet) ainsi que l'estimation du front de Pareto avec de la recherche locale.
 
-#Note : La verbose n'est qu'une aide pour estimer l'avancée des élicitations, pour voir le résultat complet d'une exécution, veuillez vous rendre sur le log généré, un descriptif sur la structure des logs est fournit dans le rapport.
+# Note : La verbose n'est qu'une aide pour estimer l'avancée des élicitations, pour voir le résultat complet d'une exécution, veuillez vous rendre sur le log généré, un descriptif sur la structure des logs est fournit dans le rapport.
 
-##Notes de lancement
+## Notes de lancement
 - Pour lancer PLS:
 lancer le fichier PLS.py va lancer pour n=15 et p=3 les deux variantes de PLS codées. Il y aura de la verbose dans la console et les logs seront dans ./logs. Les valeurs de n et de p sont modifiables dans le if __name__== "__main__":
 

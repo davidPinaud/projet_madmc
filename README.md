@@ -1,7 +1,8 @@
 # Projet 
 Projet pour la matière MADMC (Modèles et Algorithmes en Décision et Multicritère et Collective) sur l'élicitation de plusieurs modèles multicritères (OWA, Somme pondérée et Intégrale de Choquet) ainsi que l'estimation du front de Pareto avec de la recherche locale.
 
-# Note : La verbose n'est qu'une aide pour estimer l'avancée des élicitations, pour voir le résultat complet d'une exécution, veuillez vous rendre sur le log généré, un descriptif sur la structure des logs est fournit dans le rapport.
+# Note : 
+La verbose n'est qu'une aide pour estimer l'avancée des élicitations, pour voir le résultat complet d'une exécution, veuillez vous rendre sur le log généré, un descriptif sur la structure des logs est fournit dans le rapport.
 
 ## Notes de lancement
 - Pour lancer PLS:
